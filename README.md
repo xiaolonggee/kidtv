@@ -201,3 +201,12 @@ python scripts/simulate_device.py http://127.0.0.1:8600 /路径/启蒙视频
 ## 扩展计划
 
 「媳妇儿锻炼打卡」等家庭成员模块的预留接口见 `docs/EXTENDING.md`。
+
+---
+
+## 社区致谢
+
+感谢 [LINUX DO](https://linux.do) 社区的讨论与反馈氛围。欢迎佬友试用、提 Issue / PR。
+
+项目主页：https://github.com/xiaolonggee/kidtv  
+许可证：MIT
