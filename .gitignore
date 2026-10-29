@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+server/data/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+*.apk.idsig
+*.apk
+
+# Keystores & secrets — NEVER commit
+*.jks
+*.keystore
+**/keystore/
+**/keystore/**
+android/keystore/
+android/keystore.properties
+**/keystore.properties
+secrets/
+**/secrets/
+*.pem
+*.p12
+google-services.json
+local.properties
+
+# OS
+.DS_Store

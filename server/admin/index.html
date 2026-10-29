@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宝宝动画屋 · 管理后台</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="loginView" class="login hidden">
+  <div class="login-box">
+    <div class="logo">🧸</div>
+    <h1>宝宝动画屋</h1>
+    <p class="sub">管理后台 · 自托管服务</p>
+    <input id="pw" type="password" placeholder="管理密码" autocomplete="current-password">
+    <button id="loginBtn" class="btn primary wide">登录</button>
+    <p id="loginErr" class="err hidden"></p>
+    <p class="hint">默认密码 admin123，可用环境变量 ADMIN_PASSWORD 修改</p>
+  </div>
+</div>
+
+<div id="appView" class="hidden">
+  <header class="topbar">
+    <div class="brand">🧸 <b>宝宝动画屋</b><span class="sub">管理后台</span></div>
+    <nav class="tabs">
+      <button class="tab on" data-view="dash">📊 概览</button>
+      <button class="tab" data-view="devices">📺 设备</button>
+      <button class="tab" data-view="content">🎬 内容库</button>
+    </nav>
+    <button id="logoutBtn" class="btn ghost">退出</button>
+  </header>
+
+  <!-- ===================== 概览 ===================== -->
+  <main id="view-dash" class="view">
+    <div class="rowbar">
+      <label>设备：</label>
+      <select id="dashDevice"></select>
+      <span id="dashEmpty" class="muted hidden">还没有已配对的设备 — 去「设备」页生成配对码</span>
+    </div>
+    <div id="dashBody" class="hidden">
+      <div class="cards">
+        <div class="stat"><div class="k">📺 今天</div><div class="v" id="stToday">–</div></div>
+        <div class="stat"><div class="k">🔥 连续打卡</div><div class="v" id="stStreak">–</div></div>
+        <div class="stat"><div class="k">⏱ 本周观看（周一起）</div><div class="v" id="stWeek">–</div></div>
+      </div>
+      <div class="panes">
+        <section class="pane">
+          <div class="pane-head">
+            <h2>📅 打卡日历</h2>
+            <div><button id="calPrev" class="btn sm">◀</button>
+            <span id="calTitle" class="cal-title"></span>
+            <button id="calNext" class="btn sm">▶</button></div>
+          </div>
+          <div class="wk"><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div></div>
+          <div id="calDays" class="days"></div>
+        </section>
+        <section class="pane">
+          <h2>📈 本周（每日集数 / 分钟）</h2>
+          <div id="weekBars" class="weekbars"></div>
+          <h2 style="margin-top:18px">🎬 各系列累计</h2>
+          <div id="seriesStats"></div>
+          <h2 style="margin-top:18px">⭐ 单集次数（前 20）</h2>
+          <div id="episodeStats"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===================== 设备 ===================== -->
+  <main id="view-devices" class="view hidden">
+    <div class="rowbar">
+      <button id="newCodeBtn" class="btn primary">➕ 生成配对码</button>
+      <span id="codeOut" class="code hidden"></span>
+    </div>
+    <div id="deviceList" class="device-list"></div>
+  </main>
+
+  <!-- ===================== 内容库 ===================== -->
+  <main id="view-content" class="view hidden">
+    <section class="pane upload-pane">
+      <h2>⬆️ 上传视频（支持大文件 · 分块续传）</h2>
+      <div class="upload-form">
+        <input id="upLang" list="langList" placeholder="语言，如 英语">
+        <datalist id="langList"><option value="英语"><option value="法语"></datalist>
+        <input id="upSeries" placeholder="动画名（文件夹名），如 Mouse Boo 小鼠波波">
+        <input id="upTitle" placeholder="集标题（可选），如 Colors">
+        <input id="upFile" type="file" accept="video/*" multiple>
+        <button id="upBtn" class="btn primary">开始上传</button>
+      </div>
+      <p class="hint">文件名请带集号前缀：<code>01 Colors.mp4</code> 或 <code>03.mp4</code>。目录结构与 U 盘一致：<code>语言/动画名/集号 标题.mp4</code></p>
+      <div id="upProg" class="prog hidden"><div class="bar"><i id="upBar"></i></div><span id="upMsg"></span></div>
+    </section>
+    <section class="pane">
+      <h2>📂 内容库</h2>
+      <div id="contentTree" class="tree"></div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

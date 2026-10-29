@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宝宝动画屋 · Little Ears (TV Prototype)</title>
+<style>
+/* ============================================================
+   宝宝动画屋 — Android TV prototype (single file, no network)
+   Design base: 1280x720 stage, scaled to fit any window.
+   ============================================================ */
+:root{
+  --bg:#0B1433; --bg2:#13214F; --panel:#1A2B63; --text:#FFFFFF; --muted:#B9C4E8;
+  --focus:#FFD400; --good:#4ADE80; --warn:#FF8A3D; --star:#FFC531; --off:#4A5A8C;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#050A1C;overflow:hidden;color:var(--text);
+  font-family:"Noto Sans CJK SC","Noto Sans SC","PingFang SC","Microsoft YaHei","Source Han Sans SC",system-ui,sans-serif;}
+#stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;overflow:hidden;
+  transform:translate(-50%,-50%) scale(var(--s,1));
+  background:radial-gradient(1200px 600px at 80% -10%,#24408F 0%,transparent 60%),linear-gradient(180deg,var(--bg2),var(--bg));}
+.screen{position:absolute;inset:0;display:none;padding:22px 40px}
+.screen.active{display:block}
+button{font:inherit;color:inherit;border:0;background:none;padding:0}
+h2{margin:0;font-size:28px;font-weight:800;display:flex;align-items:baseline;gap:12px}
+h2 small{font-size:17px;color:var(--muted);font-weight:500}
+
+/* ---------- focus ring (the D-pad cursor) ---------- */
+[data-f]{transition:transform .15s ease, box-shadow .15s ease;cursor:pointer;position:relative;outline:none}
+.focused{box-shadow:0 0 0 6px var(--focus),0 0 30px 8px rgba(255,212,0,.55)!important;transform:scale(1.06);z-index:5}
+.focused.flat{transform:scale(1.03)}
+
+/* ---------- generic bits ---------- */
+.btn{display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 22px;border-radius:26px;background:var(--panel);
+  font-size:21px;font-weight:700;border:2px solid rgba(255,255,255,.12)}
+.btn.primary{background:#FFD400;color:#1B1B1B}
+.btn.danger{background:#E2435B}
+.pill{display:inline-flex;align-items:center;gap:6px;height:48px;padding:0 20px;border-radius:24px;background:rgba(255,255,255,.1);font-size:20px;font-weight:600}
+.pill b{font-size:24px;color:var(--focus)}
+.pill.done{background:rgba(74,222,128,.2)} .pill.done b{color:var(--good)}
+.stars{color:var(--star);letter-spacing:2px;font-size:22px;line-height:1}
+.stars .off{color:var(--off)}
+.badge{position:absolute;top:10px;left:10px;padding:3px 10px;border-radius:12px;font-size:15px;font-weight:800;background:rgba(0,0,0,.45)}
+.badge.r{left:auto;right:10px;background:#FF4D7E}
+.badge.ok{background:var(--good);color:#063}
+.hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:var(--muted);font-size:15px;opacity:.8}
+.toast{position:absolute;left:50%;bottom:44px;transform:translateX(-50%) translateY(30px);opacity:0;background:#000C;padding:14px 28px;border-radius:30px;font-size:20px;transition:.3s;z-index:100;pointer-events:none;border:2px solid #fff3}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ---------- art placeholder (CSS + emoji) ---------- */
+.art{position:relative;border-radius:22px;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.55) 0 18%,transparent 19%),
+             radial-gradient(circle at 85% 90%,rgba(255,255,255,.25) 0 22%,transparent 23%),
+             linear-gradient(135deg,var(--c1),var(--c2));}
+.art .emo{filter:drop-shadow(0 6px 8px rgba(0,0,0,.25))}
+
+/* ---------- HOME ---------- */
+.topbar{display:flex;align-items:center;justify-content:space-between;height:68px;margin-bottom:12px}
+.brand{display:flex;align-items:center;gap:14px}
+.logo{font-size:48px}
+.brand .t1{font-size:32px;font-weight:900;letter-spacing:2px}
+.brand .t2{font-size:16px;color:var(--muted)}
+.topbar .right{display:flex;gap:14px;align-items:center}
+.row{display:flex;gap:20px;padding:14px 12px;margin:0 -12px;overflow:hidden;scroll-padding:16px}
+.pcard{flex:0 0 218px;height:172px;border-radius:24px;background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+.pcard .art{height:96px;border-radius:0;font-size:56px}
+.pcard .meta{padding:8px 14px}
+.pcard .t{font-size:19px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .s{display:flex;justify-content:space-between;align-items:center;margin-top:4px;color:var(--muted);font-size:15px}
+.pcard .stars{font-size:18px}
+.tabs{display:flex;gap:16px;margin:8px 0 2px}
+.tab{height:58px;padding:0 30px;border-radius:29px;font-size:26px;font-weight:800;background:rgba(255,255,255,.08);display:flex;align-items:center;gap:10px;border:3px solid transparent}
+.tab.on{background:#fff;color:#13214F}
+.tab small{font-size:17px;font-weight:600;opacity:.75}
+.scard{flex:0 0 372px;height:194px;border-radius:26px;overflow:hidden;display:flex;background:var(--panel)}
+.scard .art{width:170px;border-radius:0;font-size:84px}
+.scard .meta{padding:16px 18px;display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.scard .t{font-size:25px;font-weight:900;line-height:1.15}
+.scard .cn{font-size:19px;color:var(--muted)}
+.scard .prog{margin-top:auto;font-size:16px;color:var(--muted)}
+.bar-mini{height:10px;border-radius:5px;background:#0006;overflow:hidden;margin-top:6px}
+.bar-mini i{display:block;height:100%;background:linear-gradient(90deg,#FFD400,#FF8A3D)}
+.fav{color:#FF7AA2;font-weight:800;font-size:16px}
+
+/* ---------- SERIES ---------- */
+.shead{display:flex;align-items:center;gap:22px;height:116px}
+.shead .art{width:120px;height:100px;font-size:62px;flex:0 0 auto}
+.shead h1{margin:0;font-size:36px;font-weight:900}
+.shead h1 span{font-size:24px;color:var(--muted);font-weight:600;margin-left:10px}
+.path{font-family:"Noto Sans Mono CJK SC",monospace;font-size:14px;color:#9FB0E0;margin-top:6px;background:#0005;padding:4px 10px;border-radius:8px;display:inline-block}
+.legend{margin-left:auto;text-align:right;color:var(--muted);font-size:16px;line-height:1.6}
+.sscroll{position:absolute;left:28px;right:28px;top:142px;bottom:30px;overflow:hidden;padding:0 12px;scroll-padding:20px}
+.ghead{font-size:22px;font-weight:800;margin:10px 0 2px;display:flex;align-items:center;gap:10px}
+.ghead small{color:var(--muted);font-weight:500;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:18px;padding:12px 0 16px}
+.ep{height:150px;border-radius:22px;background:var(--panel);padding:12px 16px;display:flex;flex-direction:column;border:2px solid rgba(255,255,255,.08)}
+.ep .num{font-size:34px;font-weight:900;line-height:1;color:var(--c1)}
+.ep .t{font-size:18px;font-weight:800;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ep .cn{font-size:15px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ep .bot{margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end}
+.ep .file{font-size:13px;color:#8C9BCB;font-family:"Noto Sans Mono CJK SC",monospace}
+.ep .stars{font-size:19px;letter-spacing:1px}
+.ep .fname{position:absolute;top:14px;right:16px}
+.ep.mastered{background:linear-gradient(135deg,#1F5B3A,#1A2B63)}
+.ep.new .num::after{content:" 新";font-size:16px;color:#FF7AA2;vertical-align:top}
+.empty{color:var(--muted);font-size:18px;padding:12px 0 20px}
+
+/* ---------- PLAYER ---------- */
+#player{padding:0}
+.scene{position:absolute;inset:0;background:linear-gradient(180deg,var(--c2) 0%,var(--c1) 70%,#7ED957 70%,#5CBF3A 100%);overflow:hidden}
+.sun{position:absolute;right:120px;top:70px;width:110px;height:110px;border-radius:50%;background:#FFE15A;box-shadow:0 0 60px 20px #FFE15A88;animation:spin 8s linear infinite}
+.cloud{position:absolute;width:160px;height:50px;background:#fff;border-radius:30px;opacity:.9;animation:drift 18s linear infinite}
+.cloud::before{content:"";position:absolute;width:70px;height:70px;background:#fff;border-radius:50%;left:30px;top:-35px}
+.hero{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font-size:210px;animation:bounce 1.1s ease-in-out infinite}
+.sim{position:absolute;left:50%;top:76%;transform:translateX(-50%);background:#0005;padding:6px 16px;border-radius:14px;font-size:16px}
+.paused .hero,.paused .sun,.paused .cloud{animation-play-state:paused}
+.ptop{position:absolute;left:0;right:0;top:0;padding:22px 40px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(#000a,transparent);font-size:24px;font-weight:800}
+.pbot{position:absolute;left:0;right:0;bottom:0;padding:30px 40px 26px;background:linear-gradient(transparent,#000c)}
+.pbar{position:relative;height:16px;border-radius:8px;background:#fff4}
+.pbar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:8px;background:linear-gradient(90deg,#FFD400,#FF8A3D)}
+.pbar .knob{position:absolute;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:#fff;box-shadow:0 2px 8px #0008}
+.pbar .mark{position:absolute;top:-8px;bottom:-8px;width:4px;background:#4ADE80;border-radius:2px}
+.pbar .mark span{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);font-size:15px;color:#4ADE80;background:#000b;padding:2px 10px;border-radius:10px;white-space:nowrap;font-weight:700}
+.pctrl{display:flex;align-items:center;gap:22px;margin-top:16px;font-size:22px}
+.pctrl .pp{font-size:34px;width:48px}
+.pctrl .time{font-family:"Noto Sans Mono CJK SC",monospace;font-weight:700}
+.pctrl .h{color:#ddd;font-size:17px}
+.pctrl .file{margin-left:auto;font-size:13px;color:#ccc;font-family:"Noto Sans Mono CJK SC",monospace}
+.bigpause{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:150px;height:150px;border-radius:50%;background:#000a;display:none;align-items:center;justify-content:center;font-size:70px}
+.paused .bigpause{display:flex}
+
+/* ---------- MODAL / OVERLAYS ---------- */
+#modal{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(5,10,28,.72);z-index:50}
+#modal.open{display:flex}
+.mbox{background:linear-gradient(160deg,#2A3F8F,#1A2B63);border-radius:36px;padding:34px 50px;text-align:center;min-width:560px;border:3px solid #fff3;box-shadow:0 30px 80px #0009;position:relative}
+.cele .big{font-size:64px;font-weight:900;color:#FFD400;text-shadow:0 4px 0 #B45309}
+.cele .emo{font-size:110px;animation:hop .8s ease-in-out infinite}
+.cele .stars{font-size:46px;margin:10px 0}
+.cele .stars .pop{display:inline-block;animation:pop .7s cubic-bezier(.3,1.8,.5,1) both .3s}
+.cele p{font-size:21px;color:#E5EBFF;margin:8px 0}
+.mbtns{display:flex;gap:18px;justify-content:center;margin-top:18px}
+.confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.confetti i{position:absolute;top:-20px;width:14px;height:20px;border-radius:3px;animation:fall 2.6s linear infinite}
+.count{font-size:110px;font-weight:900;color:#FFD400;line-height:1}
+.nextcard{display:flex;gap:18px;align-items:center;background:#0004;border-radius:22px;padding:12px;margin:14px 0;text-align:left}
+.nextcard .art{width:120px;height:84px;font-size:48px}
+
+/* ---------- DONE ---------- */
+#done{text-align:center;background:radial-gradient(circle at 50% 30%,#2B3C86,#0B1433 70%)}
+.moon{font-size:150px;margin-top:40px;animation:float 3s ease-in-out infinite}
+#done h1{font-size:50px;margin:18px 0 6px}
+#done .sub{font-size:24px;color:var(--muted)}
+.twinkle{position:absolute;font-size:30px;animation:tw 2s ease-in-out infinite}
+
+/* ---------- CALENDAR ---------- */
+.chead{display:flex;align-items:center;gap:18px;height:70px}
+.chead h1{margin:0;font-size:34px;font-weight:900;flex:1}
+.cal{position:absolute;left:40px;top:104px;width:780px}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:8px;text-align:center;color:var(--muted);font-size:19px;font-weight:700}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
+.day{height:84px;border-radius:18px;background:rgba(255,255,255,.07);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:20px;font-weight:700}
+.day.blank{background:transparent}
+.day.on{background:linear-gradient(135deg,#FFE27A,#FFB347);color:#4A2B00}
+.day .stk{font-size:30px;line-height:1.1}
+.day.today{border:3px solid #fff}
+.day.future{opacity:.45}
+.cside{position:absolute;right:40px;top:104px;width:370px;display:flex;flex-direction:column;gap:14px}
+.stat{background:var(--panel);border-radius:22px;padding:16px 22px}
+.stat .k{color:var(--muted);font-size:17px}
+.stat .v{font-size:40px;font-weight:900}
+.stat .v small{font-size:20px;font-weight:600;color:var(--muted)}
+
+/* ---------- GATE ---------- */
+.gate{text-align:center;padding-top:40px}
+.gate h1{font-size:40px;margin:10px 0}
+.q{font-size:76px;font-weight:900;margin:12px 0 22px}
+.opts{display:flex;gap:24px;justify-content:center}
+.opt{width:150px;height:110px;border-radius:26px;background:var(--panel);font-size:52px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.hold{margin:36px auto 0;width:420px;height:70px;border-radius:35px;background:var(--panel);font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.hold .fillh{position:absolute;left:0;top:0;bottom:0;width:0;background:#4ADE8066}
+.hold span{position:relative}
+.shake{animation:shake .4s}
+
+/* ---------- PARENT ---------- */
+.plist{position:absolute;left:40px;top:104px;width:720px;display:flex;flex-direction:column;gap:12px}
+.set{height:62px;border-radius:20px;background:var(--panel);display:flex;align-items:center;padding:0 22px;font-size:22px;font-weight:700}
+.set small{color:var(--muted);font-size:15px;font-weight:500;margin-left:10px}
+.set .val{margin-left:auto;display:flex;align-items:center;gap:14px}
+.set .val b{min-width:110px;text-align:center;font-size:26px;color:var(--focus)}
+.arrow{width:40px;height:40px;border-radius:50%;background:#fff2;display:flex;align-items:center;justify-content:center;font-size:18px}
+.pbtns{display:flex;gap:18px;margin-top:6px}
+.pinfo{position:absolute;right:40px;top:104px;width:410px;background:var(--panel);border-radius:24px;padding:20px 24px;font-size:17px;line-height:1.7;color:#DDE4FF}
+.pinfo h3{margin:0 0 6px;font-size:21px;color:#fff}
+.mono{font-family:"Noto Sans Mono CJK SC",monospace;font-size:14px;color:#9FB0E0}
+
+/* ---------- animations ---------- */
+@keyframes bounce{0%,100%{transform:translate(-50%,-50%) translateY(0)}50%{transform:translate(-50%,-50%) translateY(-24px)}}
+.cele .emo,.moon{display:inline-block}
+@keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes drift{from{transform:translateX(-200px)}to{transform:translateX(1500px)}}
+@keyframes pop{from{transform:scale(0) rotate(-40deg)}to{transform:scale(1) rotate(0)}}
+@keyframes fall{to{transform:translateY(760px) rotate(720deg)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@keyframes tw{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-14px)}75%{transform:translateX(14px)}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <section class="screen" id="home"></section>
+  <section class="screen" id="series"></section>
+  <section class="screen" id="player"></section>
+  <section class="screen" id="calendar"></section>
+  <section class="screen" id="gate"></section>
+  <section class="screen" id="parent"></section>
+  <section class="screen" id="done"></section>
+  <div id="modal"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   1. CONSTANTS & MOCK LIBRARY
+   The library mirrors what a scanner would find on USB / TV storage:
+     <ROOT>/启蒙视频/英语/<动画名>/01.mp4, 02.mp4 ...
+     <ROOT>/启蒙视频/法语/<动画名>/...
+   ===================================================================== */
+const TODAY = '2026-10-19';            // prototype "today" (fixed for the demo)
+const ROOT = '/storage/usb0/启蒙视频';  // mock scan root
+const LANG = { en: { folder: '英语', label: '英语', sub: 'English', tag: 'EN' },
+               fr: { folder: '法语', label: '法语', sub: 'Français', tag: 'FR' } };
+const STORE_KEY = 'kidtv.state.v1';
+
+const SERIES = [
+  { id: 'mouseboo', lang: 'en', folder: 'Mouse Boo 小鼠波波', name: 'Mouse Boo', cn: '小鼠波波', emoji: '🐭',
+    c1: '#FF8FB1', c2: '#FFD1DC', dur: 300, fav: true, eps: [
+    ['Hello, Boo!', '你好，波波'], ['Colors', '认颜色'], ['Bath Time', '洗澡啦'], ['Counting 1-2-3', '数一数'],
+    ['Big and Small', '大和小'], ['Yummy Fruit', '好吃的水果'], ['Bedtime', '睡觉啦'], ['Rainy Day', '下雨天'],
+    ['My Family', '我的家人'], ['Animal Friends', '动物朋友'], ['Shapes', '认形状'], ['Happy Birthday', '生日快乐'] ] },
+  { id: 'peppa', lang: 'en', folder: 'Peppa Pig', name: 'Peppa Pig', cn: '小猪佩奇', emoji: '🐷',
+    c1: '#FF6F91', c2: '#FFC2D1', dur: 300, eps: [
+    ['Muddy Puddles', '跳泥坑'], ['Mr Dinosaur Is Lost', '恐龙先生不见了'], ['Best Friend', '好朋友'],
+    ['Polly Parrot', '鹦鹉波莉'], ['Hide and Seek', '捉迷藏'], ['The Playgroup', '幼儿园'],
+    ['Mummy Pig at Work', '猪妈妈在工作'], ['Piggy in the Middle', '抢球游戏'], ['Daddy Loses His Glasses', '爸爸的眼镜'],
+    ['Gardening', '种花'] ] },
+  { id: 'sss', lang: 'en', folder: 'Super Simple Songs', name: 'Super Simple Songs', cn: '超级简单儿歌', emoji: '🎵',
+    c1: '#4FB3FF', c2: '#B8E2FF', dur: 150, eps: [
+    ['Hello Song', '你好歌'], ['Twinkle Twinkle Little Star', '小星星'], ['Five Little Ducks', '五只小鸭'],
+    ['The Wheels on the Bus', '巴士的轮子'], ['Old MacDonald', '老麦克唐纳'], ["If You're Happy", '如果你快乐'],
+    ['Head Shoulders Knees & Toes', '头肩膀膝盖脚'], ['Bath Song', '洗澡歌'], ['Rain Rain Go Away', '雨啊雨快走开'],
+    ['Baa Baa Black Sheep', '黑绵羊'] ] },
+  { id: 'tchoupi', lang: 'fr', folder: "T'choupi", name: "T'choupi", cn: '小企鹅丘比', emoji: '🐧',
+    c1: '#FFC93C', c2: '#FFF0B3', dur: 360, eps: [
+    ["T'choupi fait du vélo", '骑自行车'], ["T'choupi à la plage", '去海边'], ["T'choupi ne veut pas dormir", '不想睡觉'],
+    ["T'choupi prend son bain", '洗澡'], ["T'choupi au parc", '在公园'], ['Joyeux anniversaire', '生日快乐'],
+    ["T'choupi jardine", '种花园'], ['La galette des rois', '国王饼'], ["T'choupi a peur du noir", '怕黑'],
+    ["T'choupi et Doudou", '和豆豆'] ] },
+  { id: 'peppafr', lang: 'fr', folder: 'Peppa Pig (FR)', name: 'Peppa Pig (FR)', cn: '小猪佩奇 法语版', emoji: '🐷',
+    c1: '#B48CFF', c2: '#E3D4FF', dur: 300, eps: [
+    ['Les flaques de boue', '跳泥坑'], ['Monsieur Dinosaure est perdu', '恐龙先生不见了'], ['La meilleure amie', '好朋友'],
+    ['Polly le perroquet', '鹦鹉波莉'], ['Cache-cache', '捉迷藏'], ["Le jardin d'enfants", '幼儿园'],
+    ['Maman Pig au travail', '猪妈妈在工作'], ['Le jeu du ballon', '抢球游戏'] ] },
+  { id: 'comptines', lang: 'fr', folder: 'Comptines', name: 'Comptines', cn: '法语儿歌', emoji: '🎶',
+    c1: '#2FD3A6', c2: '#B5F5E3', dur: 120, eps: [
+    ['Frère Jacques', '两只老虎（原曲）'], ['Une souris verte', '一只绿老鼠'], ['Au clair de la lune', '月光下'],
+    ['Alouette', '云雀'], ['Ainsi font, font, font', '小木偶'], ['Il pleut, bergère', '下雨了，牧羊女'] ] },
+];
+/* Order used when filling the weekly playlist (favourite first, alternating languages) */
+const PLAYLIST_ORDER = ['mouseboo', 'tchoupi', 'peppa', 'peppafr', 'sss', 'comptines'];
+
+const pad = n => String(n).padStart(2, '0');
+const SER = {}, EPS = {};
+SERIES.forEach(s => {
+  SER[s.id] = s;
+  s.epIds = s.eps.map(([title, cn], i) => {
+    const id = `${s.id}-${pad(i + 1)}`;
+    EPS[id] = { id, s, n: i + 1, title, cn, dur: s.dur + ((i * 17) % 40) - 20,
+      path: `${ROOT}/${LANG[s.lang].folder}/${s.folder}/${pad(i + 1)}.mp4` };
+    return id;
+  });
+});
+
+/* =====================================================================
+   2. STATE (persisted in localStorage)
+   ===================================================================== */
+function seedState() {
+  const plays = {
+    'mouseboo-01': 5, 'mouseboo-02': 4, 'mouseboo-03': 3, 'mouseboo-04': 2, 'mouseboo-05': 1,
+    'peppa-01': 3, 'peppa-02': 2, 'peppa-03': 1,
+    'sss-01': 4, 'sss-02': 2, 'sss-03': 2, 'sss-04': 1,
+    'tchoupi-01': 2, 'tchoupi-02': 1, 'peppafr-01': 1, 'comptines-01': 1,
+  };
+  // Check-in history: date -> {eps, sec}
+  const history = {};
+  const add = (d, eps, sec) => history[d] = { eps, sec };
+  [['09-14',2,600],['09-15',1,300],['09-17',2,660],['09-20',2,540],['09-22',1,300],['09-25',2,600],['09-28',2,620],
+   ['10-01',2,600],['10-02',1,300],['10-04',2,660],['10-05',2,420],['10-06',1,360],['10-08',2,600],['10-09',2,540],
+   ['10-11',1,300],['10-12',2,600],['10-13',2,720],['10-15',2,600],['10-16',1,300],['10-17',2,660],['10-18',2,600]]
+    .forEach(([md, e, s]) => add('2026-' + md, e, s));
+  history[TODAY] = { eps: 1, sec: 300 };   // today: 1 episode already watched
+  return {
+    v: 1,
+    settings: { dailyLimit: 2, threshold: 75, masterStars: 5, playlistSize: 4, autoplay: true, speed: 30 },
+    plays, history,
+    playlist: ['mouseboo-02', 'tchoupi-01', 'mouseboo-03', 'peppa-01'],
+  };
+}
+let state = load();
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(STORE_KEY)); if (s && s.v === 1) return s; } catch (e) {}
+  const s = seedState(); localStorage.setItem(STORE_KEY, JSON.stringify(s)); return s;
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+/* ---------- derived helpers ---------- */
+const plays = id => state.plays[id] || 0;
+const isMastered = id => plays(id) >= state.settings.masterStars;
+const todayEps = () => (state.history[TODAY] || {}).eps || 0;
+const limitReached = () => todayEps() >= state.settings.dailyLimit;
+const parseD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const fmtD = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const watchedOn = d => ((state.history[fmtD(d)] || {}).eps || 0) > 0;
+const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+const mmss = s => `${pad(Math.floor(s / 60))}:${pad(Math.floor(s % 60))}`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function streak() {
+  let d = parseD(TODAY), n = 0;
+  if (!watchedOn(d)) d = addDays(d, -1);          // today not yet watched: streak still alive from yesterday
+  while (watchedOn(d)) { n++; d = addDays(d, -1); }
+  return n;
+}
+function weekSeconds() {                          // Monday-based current week
+  const t = parseD(TODAY), mon = addDays(t, -((t.getDay() + 6) % 7));
+  let s = 0; for (let i = 0; i < 7; i++) s += (state.history[fmtD(addDays(mon, i))] || {}).sec || 0;
+  return s;
+}
+function last7Seconds() {
+  let s = 0; for (let i = 0; i < 7; i++) s += (state.history[fmtD(addDays(parseD(TODAY), -i))] || {}).sec || 0;
+  return s;
+}
+function starsHTML(id) {
+  const max = state.settings.masterStars, n = Math.min(plays(id), max);
+  return `<span class="stars">${'★'.repeat(n)}<span class="off">${'★'.repeat(max - n)}</span></span>`;
+}
+function artStyle(s) { return `--c1:${s.c1};--c2:${s.c2}`; }
+
+/* ---------- weekly playlist ---------- */
+const nextCandidate = (s, pl) => s.epIds.find(id => !isMastered(id) && !pl.includes(id));
+function refreshPlaylist(masteredId) {
+  let pl = (state.playlist || []).filter(id => EPS[id]);
+  if (masteredId) {            // replace the mastered episode with the next new one of the same series
+    const i = pl.indexOf(masteredId), nxt = nextCandidate(EPS[masteredId].s, pl);
+    if (i >= 0) { if (nxt) pl[i] = nxt; else pl.splice(i, 1); }
+  }
+  pl = pl.filter(id => !isMastered(id));
+  const size = state.settings.playlistSize;
+  for (let pass = 0; pass < 20 && pl.length < size; pass++) {
+    let added = false;
+    for (const sid of PLAYLIST_ORDER) {
+      if (pl.length >= size) break;
+      const c = nextCandidate(SER[sid], pl); if (c) { pl.push(c); added = true; }
+    }
+    if (!added) break;
+  }
+  state.playlist = pl.slice(0, size);
+}
+
+/** Count one completed play. Returns info for the celebration overlay. */
+function recordPlay(id, watchedSec) {
+  const before = plays(id);
+  state.plays[id] = before + 1;
+  const h = state.history[TODAY] || (state.history[TODAY] = { eps: 0, sec: 0 });
+  h.eps += 1; h.sec += Math.round(watchedSec);
+  const ms = state.settings.masterStars;
+  const mastered = before < ms && before + 1 >= ms;
+  refreshPlaylist(mastered ? id : null);
+  save();
+  return { before, after: before + 1, mastered };
+}
+
+/* =====================================================================
+   3. NAVIGATION: screens, back stack, focus (spatial D-pad navigation)
+   ===================================================================== */
+const $ = sel => document.querySelector(sel);
+const stage = $('#stage'), modal = $('#modal');
+let cur = null, stack = [], focusEl = null, modalCtx = null, homeTab = 'en';
+const lastFocus = {};
+const focusKeyFor = (name, p) => name === 'series' ? 'series:' + p.sid : name;
+
+function show(name, params = {}) { stack.push({ name, params }); render(name, params); }
+function replaceTop(name, params = {}) { stack[stack.length - 1] = { name, params }; render(name, params); }
+function goHome() { stack = [{ name: 'home', params: {} }]; render('home', {}); }
+function render(name, params) {
+  if (cur === 'player' && name !== 'player') stopPlayer();
+  closeModal(true);
+  cur = name;
+  document.querySelectorAll('.screen').forEach(el => el.classList.toggle('active', el.id === name));
+  RENDER[name](params);
+  const scope = $('#' + name), key = lastFocus[focusKeyFor(name, params)];
+  const el = (key && scope.querySelector(`[data-key="${CSS.escape(key)}"]`)) ||
+             scope.querySelector('[data-default]') || scope.querySelector('[data-f]');
+  setFocus(el, true);
+}
+function back() {
+  if (modalCtx) { modalCtx.onBack ? modalCtx.onBack() : closeModal(); return; }
+  if (cur === 'player' && P && !P.finished) { finishPlay(false); return; }
+  if (cur === 'done') { goHome(); return; }
+  if (stack.length > 1) { stack.pop(); const t = stack[stack.length - 1]; render(t.name, t.params); }
+  else toast('这里就是首页啦 🏠');
+}
+function scopeEl() { return modalCtx ? modal : $('#' + cur); }
+
+function setFocus(el, instant) {
+  if (focusEl) focusEl.classList.remove('focused');
+  focusEl = el || null;
+  if (!el) return;
+  el.classList.add('focused');
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: instant ? 'auto' : 'smooth' });
+  if (!modalCtx && el.dataset.key) { const t = stack[stack.length - 1]; lastFocus[focusKeyFor(cur, t ? t.params : {})] = el.dataset.key; }
+  if (el.dataset.tab && el.dataset.tab !== homeTab) { homeTab = el.dataset.tab; renderHomeSeries(); }
+  if (el.dataset.day) updateDayDetail(el.dataset.day);
+}
+
+/** Spatial navigation: pick the closest focusable element in the pressed direction. */
+function moveFocus(dir) {
+  const items = [...scopeEl().querySelectorAll('[data-f]')].filter(e => e.offsetParent !== null);
+  if (!items.length) return;
+  if (!focusEl || !items.includes(focusEl)) { setFocus(items[0]); return; }
+  const r = focusEl.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  let best = null, bestScore = Infinity;
+  for (const el of items) {
+    if (el === focusEl) continue;
+    const q = el.getBoundingClientRect();
+    const ex = q.left + q.width / 2, ey = q.top + q.height / 2;
+    let primary, secondary;
+    if (dir === 'left' || dir === 'right') {
+      primary = dir === 'right' ? q.left - r.right : r.left - q.right;
+      if ((dir === 'right' ? ex - cx : cx - ex) <= 4) continue;
+      const overlap = Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top);
+      secondary = overlap > 0 ? 0 : Math.abs(ey - cy);
+    } else {
+      primary = dir === 'down' ? q.top - r.bottom : r.top - q.bottom;
+      if ((dir === 'down' ? ey - cy : cy - ey) <= 4) continue;
+      const overlap = Math.min(r.right, q.right) - Math.max(r.left, q.left);
+      secondary = overlap > 0 ? Math.abs(ex - cx) * 0.3 : Math.abs(ex - cx);
+    }
+    const score = Math.max(primary, 0) + secondary * 2.5;
+    if (score < bestScore) { bestScore = score; best = el; }
+  }
+  if (best) setFocus(best);
+}
+
+function activate(el) {
+  if (!el) return;
+  const a = el.dataset.action, arg = el.dataset.arg;
+  if (a && ACTIONS[a]) ACTIONS[a](arg, el);
+}
+
+/* ---------- keyboard = TV remote ---------- */
+const DIRS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+document.addEventListener('keydown', e => {
+  if (DIRS[e.key]) {
+    e.preventDefault();
+    if (!modalCtx && cur === 'parent' && focusEl && focusEl.dataset.setting && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      stepSetting(focusEl.dataset.setting, e.key === 'ArrowLeft' ? -1 : 1); return;
+    }
+    if (!modalCtx && cur === 'player') { flashControls(); return; }
+    moveFocus(DIRS[e.key]);
+  } else if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    if (e.repeat) return;
+    if (!modalCtx && cur === 'player') { togglePause(); return; }
+    if (focusEl && focusEl.dataset.hold !== undefined) { startHold(); return; }
+    activate(focusEl);
+  } else if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack') {
+    e.preventDefault(); back();
+  }
+});
+document.addEventListener('keyup', e => { if (e.key === 'Enter' || e.key === ' ') cancelHold(); });
+
+/* ---------- mouse / touch ---------- */
+stage.addEventListener('click', e => {
+  const step = e.target.closest('[data-step]');
+  if (step) { const row = step.closest('[data-setting]'); setFocus(row); stepSetting(row.dataset.setting, +step.dataset.step); return; }
+  const el = e.target.closest('[data-f]');
+  if (el && scopeEl().contains(el)) { if (el.dataset.hold !== undefined) return; setFocus(el); activate(el); return; }
+  if (!modalCtx && cur === 'player') togglePause();
+});
+stage.addEventListener('pointerdown', e => { const h = e.target.closest('[data-hold]'); if (h) { setFocus(h); startHold(); } });
+stage.addEventListener('pointerup', cancelHold);
+stage.addEventListener('pointerleave', cancelHold);
+
+/* ---------- modal & toast ---------- */
+let modalPrevFocus = null;
+function openModal(html, ctx = {}) {
+  if (!modalCtx) modalPrevFocus = focusEl;
+  modal.innerHTML = html; modal.classList.add('open'); modalCtx = ctx;
+  setFocus(modal.querySelector('[data-default]') || modal.querySelector('[data-f]'), true);
+}
+function closeModal(silent) {
+  if (!modalCtx && !modal.classList.contains('open')) return;
+  if (modalCtx && modalCtx.cleanup) modalCtx.cleanup();
+  modal.classList.remove('open'); modal.innerHTML = ''; modalCtx = null;
+  if (!silent && modalPrevFocus && document.contains(modalPrevFocus)) setFocus(modalPrevFocus, true);
+}
+let toastT;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* =====================================================================
+   4. SCREENS
+   ===================================================================== */
+const RENDER = {};
+
+/* ---------- HOME ---------- */
+RENDER.home = () => {
+  const d = parseD(TODAY), lim = state.settings.dailyLimit, n = todayEps();
+  const pl = state.playlist.map(id => EPS[id]).filter(Boolean);
+  $('#home').innerHTML = `
+    <div class="topbar">
+      <div class="brand"><span class="logo">🧸</span>
+        <div><div class="t1">宝宝动画屋</div>
+        <div class="t2">Little Ears · ${d.getMonth() + 1}月${d.getDate()}日 星期${WEEK[d.getDay()]}</div></div></div>
+      <div class="right">
+        <div class="pill ${n >= lim ? 'done' : ''}" id="todayPill">📺 今天 <b>${n}/${lim}</b> 集</div>
+        <div class="pill">🔥 连续 <b>${streak()}</b> 天</div>
+        <button class="btn" data-f data-key="cal" data-action="calendar">📅 打卡日历</button>
+        <button class="btn" data-f data-key="parent" data-action="gate">🔒 家长</button>
+      </div>
+    </div>
+    <h2>⭐ 本周片单 <small>This week's playlist · 每集看满 ${state.settings.masterStars} 次就“熟了”</small></h2>
+    <div class="row" id="plRow">
+      ${pl.map((e, i) => `
+        <div class="pcard" data-f data-key="pl-${e.id}" ${i === 0 ? 'data-default' : ''} data-action="play" data-arg="${e.id}">
+          <div class="art" style="${artStyle(e.s)}"><span class="emo">${e.s.emoji}</span>
+            <span class="badge">${LANG[e.s.lang].tag}</span>${plays(e.id) === 0 ? '<span class="badge r">新</span>' : ''}</div>
+          <div class="meta"><div class="t">${pad(e.n)} · ${esc(e.title)}</div>
+            <div class="s"><span>${esc(e.s.cn)}</span>${starsHTML(e.id)}</div></div>
+        </div>`).join('') || '<div class="empty">片单空空的～ 所有动画都熟了！</div>'}
+    </div>
+    <div class="tabs">
+      ${Object.entries(LANG).map(([k, L]) => `
+        <div class="tab ${homeTab === k ? 'on' : ''}" data-f data-key="tab-${k}" data-tab="${k}" data-action="tab" data-arg="${k}">
+          ${k === 'en' ? '🔤' : '🥐'} ${L.label} <small>${L.sub}</small></div>`).join('')}
+    </div>
+    <div class="row" id="seriesRow"></div>
+    <div class="hint">⬆⬇⬅➡ 移动 · OK 确认 · 返回键 返回 （键盘：方向键 / Enter / Esc）</div>`;
+  renderHomeSeries();
+};
+function renderHomeSeries() {
+  const row = $('#seriesRow'); if (!row) return;
+  document.querySelectorAll('#home .tab').forEach(t => t.classList.toggle('on', t.dataset.tab === homeTab));
+  row.innerHTML = SERIES.filter(s => s.lang === homeTab).map(s => {
+    const total = s.epIds.length, m = s.epIds.filter(isMastered).length, started = s.epIds.filter(id => plays(id) > 0).length;
+    return `<div class="scard" data-f data-key="s-${s.id}" data-action="series" data-arg="${s.id}">
+      <div class="art" style="${artStyle(s)}"><span class="emo">${s.emoji}</span></div>
+      <div class="meta"><div class="t">${esc(s.name)}</div><div class="cn">${esc(s.cn)}</div>
+        ${s.fav ? '<div class="fav">❤️ 宝宝最爱</div>' : ''}
+        <div class="prog">已看 ${started}/${total} · 熟了 ${m}
+          <div class="bar-mini"><i style="width:${Math.round(started / total * 100)}%"></i></div></div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- SERIES ---------- */
+RENDER.series = ({ sid }) => {
+  const s = SER[sid], learning = s.epIds.filter(id => !isMastered(id)), review = s.epIds.filter(isMastered);
+  const firstNew = learning[0];
+  const card = id => { const e = EPS[id], m = isMastered(id);
+    return `<div class="ep ${m ? 'mastered' : ''} ${plays(id) === 0 ? 'new' : ''}" style="${artStyle(s)}" data-f data-key="ep-${id}"
+      ${id === firstNew ? 'data-default' : ''} data-action="play" data-arg="${id}">
+      ${m ? '<span class="badge ok" style="left:auto;right:10px">熟了 ✓</span>' : ''}
+      <div class="num">${pad(e.n)}</div><div class="t">${esc(e.title)}</div><div class="cn">${esc(e.cn)}</div>
+      <div class="bot">${starsHTML(id)}<span class="file">${mmss(e.dur)}</span></div>
+      ${m ? '' : `<span class="file fname">${pad(e.n)}.mp4</span>`}</div>`; };
+  $('#series').innerHTML = `
+    <div class="shead">
+      <button class="btn" data-f data-key="back" data-action="back">⬅ 返回</button>
+      <div class="art" style="${artStyle(s)}"><span class="emo">${s.emoji}</span></div>
+      <div><h1>${esc(s.name)}<span>${esc(s.cn)}</span></h1>
+        <div class="path">📁 ${esc(ROOT)}/${LANG[s.lang].folder}/${esc(s.folder)}/ → ${s.epIds.length} 个视频（01.mp4 – ${pad(s.epIds.length)}.mp4）</div></div>
+      <div class="legend">★ = 已看完的次数<br>满 ${state.settings.masterStars}★ =「熟了」→ 复习</div>
+    </div>
+    <div class="sscroll" id="sscroll">
+      <div class="ghead">📖 学习中 <small>Learning · ${learning.length} 集</small></div>
+      <div class="grid">${learning.map(card).join('') || '<div class="empty">全部都熟了，太棒啦！🎉</div>'}</div>
+      <div class="ghead">🔁 复习 <small>Review · 熟了 ${review.length} 集</small></div>
+      <div class="grid">${review.map(card).join('') || '<div class="empty">还没有“熟了”的集数，继续加油！</div>'}</div>
+    </div>`;
+};
+
+/* ---------- PLAYER (simulated) ---------- */
+let P = null;   // { id, watched (episode-seconds), playing, timer, last, finished }
+RENDER.player = ({ id }) => {
+  const e = EPS[id], s = e.s, th = state.settings.threshold;
+  $('#player').innerHTML = `
+    <div class="scene" style="${artStyle(s)}" id="scene">
+      <div class="sun"></div>
+      <div class="cloud" style="top:90px;animation-delay:-3s"></div>
+      <div class="cloud" style="top:170px;animation-delay:-11s;transform:scale(.7)"></div>
+      <div class="hero">${s.emoji}</div>
+      <div class="sim">🎬 模拟播放 · Simulated video ×${state.settings.speed} 加速</div>
+      <div class="bigpause">▶</div>
+    </div>
+    <div class="ptop"><div>${esc(s.name)} · 第${pad(e.n)}集 ${esc(e.title)} <span style="color:#ddd;font-weight:500">${esc(e.cn)}</span></div>
+      <div>📺 今天 ${todayEps()}/${state.settings.dailyLimit} · ${starsHTML(id)}</div></div>
+    <div class="pbot" id="pbot">
+      <div class="pbar"><div class="fill" id="pfill"></div><div class="mark" style="left:${th}%"><span>${th}% 算看完</span></div><div class="knob" id="pknob"></div></div>
+      <div class="pctrl"><span class="pp" id="ppIcon">⏸</span><span class="time" id="ptime">00:00 / ${mmss(e.dur)}</span>
+        <span class="h">OK 暂停/播放 · 返回 退出</span><span class="file">${esc(e.path)}</span></div>
+    </div>`;
+  startPlayer(id);
+};
+function startPlayer(id) {
+  stopPlayer();
+  P = { id, watched: 0, playing: true, last: performance.now(), finished: false };
+  P.timer = setInterval(tick, 100);
+  updatePlayerUI();
+}
+function stopPlayer() { if (P && P.timer) clearInterval(P.timer); if (P) P.timer = null; }
+function tick() {
+  const now = performance.now(), dt = (now - P.last) / 1000; P.last = now;
+  if (!P.playing || P.finished) return;
+  const e = EPS[P.id];
+  P.watched = Math.min(e.dur, P.watched + dt * state.settings.speed);
+  updatePlayerUI();
+  if (P.watched >= e.dur) finishPlay(true);
+}
+function updatePlayerUI() {
+  const e = EPS[P.id], pct = P.watched / e.dur * 100;
+  const f = $('#pfill'), k = $('#pknob'); if (!f) return;
+  f.style.width = pct + '%'; k.style.left = pct + '%';
+  $('#ptime').textContent = `${mmss(P.watched)} / ${mmss(e.dur)}`;
+  $('#ppIcon').textContent = P.playing ? '⏸' : '▶';
+  $('#player').classList.toggle('paused', !P.playing);
+}
+function togglePause() { if (!P || P.finished) return; P.playing = !P.playing; P.last = performance.now(); updatePlayerUI(); }
+function flashControls() { const b = $('#pbot'); if (b) { b.style.opacity = 1; } }
+function popPlayer() { if (stack.length > 1) stack.pop(); const t = stack[stack.length - 1] || { name: 'home', params: {} }; render(t.name, t.params); }
+
+/** ended=true: reached the end; ended=false: user pressed back. */
+function finishPlay(ended) {
+  P.finished = true; stopPlayer();
+  const id = P.id, e = EPS[id], pct = P.watched / e.dur * 100, th = state.settings.threshold;
+  if (pct >= th) {
+    const info = recordPlay(id, P.watched);
+    celebrate(id, info, () => ended ? afterEnd(id) : popPlayer());
+  } else {
+    popPlayer();
+    toast(`看了 ${Math.floor(pct)}%（未到 ${th}%），这次不算哦`);
+  }
+}
+function nextEpisode(id) {
+  const s = EPS[id].s, i = s.epIds.indexOf(id);
+  return s.epIds.slice(i + 1).find(x => !isMastered(x)) || null;
+}
+function afterEnd(id) {
+  if (limitReached()) { showDone(); return; }
+  const nx = nextEpisode(id);
+  if (state.settings.autoplay && nx) countdown(nx); else popPlayer();
+}
+function startPlay(id) {
+  if (limitReached()) { showDone(); return; }
+  if (cur === 'player') replaceTop('player', { id }); else show('player', { id });
+}
+function showDone() { stack = [{ name: 'home', params: {} }]; show('done'); }
+
+/* ---------- celebration & autoplay countdown overlays ---------- */
+function confettiHTML() {
+  const cols = ['#FFD400', '#FF6F91', '#4FB3FF', '#4ADE80', '#B48CFF', '#FF8A3D'];
+  let h = ''; for (let i = 0; i < 40; i++)
+    h += `<i style="left:${(i * 37) % 100}%;background:${cols[i % cols.length]};animation-delay:${-(i * 0.13) % 2.6}s;animation-duration:${2 + (i % 5) * 0.3}s"></i>`;
+  return `<div class="confetti">${h}</div>`;
+}
+function celebrate(id, info, next) {
+  const e = EPS[id], max = state.settings.masterStars, n = Math.min(info.after, max);
+  const starRow = '★'.repeat(Math.max(n - 1, 0)) + `<span class="pop">★</span>` + `<span class="off">${'★'.repeat(max - n)}</span>`;
+  let done = false; const go = () => { if (done) return; done = true; clearTimeout(t); closeModal(true); next(); };
+  const t = setTimeout(go, 3200);
+  openModal(`${confettiHTML()}<div class="mbox cele" id="celebrate">
+      <div class="emo">${e.s.emoji}</div>
+      <div class="big">看完啦 +1⭐</div>
+      <div class="stars">${starRow}</div>
+      <p>${esc(e.s.name)} 第${pad(e.n)}集 · 已经看了 <b>${info.after}</b> 次</p>
+      ${info.mastered ? `<p style="color:#4ADE80;font-weight:800">🎉 这一集「熟了」！移到复习，新的一集加入本周片单</p>` : ''}
+      <div class="mbtns"><button class="btn primary" data-f data-default data-action="modalOk">好的 OK</button></div>
+    </div>`, { onOk: go, onBack: go, cleanup: () => clearTimeout(t) });
+}
+function countdown(nextId) {
+  const e = EPS[nextId]; let n = 5;
+  const tick = () => { n--; const c = $('#cdNum'); if (c) c.textContent = n; if (n <= 0) playNow(); };
+  const iv = setInterval(tick, 1000);
+  const playNow = () => { clearInterval(iv); closeModal(true); startPlay(nextId); };
+  const cancel = () => { clearInterval(iv); closeModal(true); popPlayer(); };
+  openModal(`<div class="mbox">
+      <div style="font-size:24px;color:#E5EBFF">下一集马上开始 · Next</div>
+      <div class="count" id="cdNum">5</div>
+      <div class="nextcard"><div class="art" style="${artStyle(e.s)}"><span class="emo">${e.s.emoji}</span></div>
+        <div><div style="font-size:24px;font-weight:800">${pad(e.n)} · ${esc(e.title)}</div>
+        <div style="color:#B9C4E8;font-size:18px">${esc(e.s.name)} · ${esc(e.cn)}</div><div>${starsHTML(nextId)}</div></div></div>
+      <div class="mbtns"><button class="btn primary" data-f data-default data-action="modalOk">▶ 现在播放</button>
+        <button class="btn" data-f data-action="modalCancel">✋ 不看了</button></div>
+    </div>`, { onOk: playNow, onCancel: cancel, onBack: cancel, cleanup: () => clearInterval(iv) });
+}
+
+/* ---------- DONE (daily limit reached) ---------- */
+RENDER.done = () => {
+  const tw = [[90, 120], [1120, 90], [200, 520], [1060, 470], [640, 60], [330, 250], [930, 280]]
+    .map(([x, y], i) => `<span class="twinkle" style="left:${x}px;top:${y}px;animation-delay:${i * .3}s">✨</span>`).join('');
+  $('#done').innerHTML = `${tw}
+    <div class="moon">🌙</div>
+    <h1>今天的动画看完啦，明天再见！</h1>
+    <div class="sub">Bye-bye! See you tomorrow · À demain ! 👋</div>
+    <div class="sub" style="margin-top:14px">今天看了 ${todayEps()} 集 · 🔥 连续 ${streak()} 天 · 去打卡日历看看今天的贴纸吧</div>
+    <div class="mbtns" style="margin-top:34px">
+      <button class="btn primary" data-f data-default data-key="cal" data-action="calendar">📅 看看贴纸</button>
+      <button class="btn" data-f data-key="home" data-action="home">🏠 回到首页</button></div>`;
+};
+
+/* ---------- CALENDAR ---------- */
+let calYM = { y: 2026, m: 10 };
+const STICKERS = ['🌟', '🐰', '🍓', '🎈', '🦄', '🌈', '🐳', '🌻'];
+RENDER.calendar = () => {
+  const { y, m } = calYM, first = new Date(y, m - 1, 1), days = new Date(y, m, 0).getDate();
+  const lead = (first.getDay() + 6) % 7, today = parseD(TODAY);
+  let cells = ''; for (let i = 0; i < lead; i++) cells += '<div class="day blank"></div>';
+  let monthDays = 0, monthEps = 0;
+  for (let d = 1; d <= days; d++) {
+    const ds = `${y}-${pad(m)}-${pad(d)}`, h = state.history[ds], on = h && h.eps > 0;
+    const isToday = ds === TODAY, future = new Date(y, m - 1, d) > today;
+    if (on) { monthDays++; monthEps += h.eps; }
+    cells += `<div class="day ${on ? 'on' : ''} ${isToday ? 'today' : ''} ${future ? 'future' : ''}" data-f data-key="d-${ds}" data-day="${ds}"
+      ${isToday ? 'data-default' : ''}><span>${d}</span>${on ? `<span class="stk">${STICKERS[d % STICKERS.length]}</span>` : ''}</div>`;
+  }
+  $('#calendar').innerHTML = `
+    <div class="chead"><button class="btn" data-f data-key="back" data-action="back">⬅ 返回</button>
+      <h1>📅 打卡日历 <span style="font-size:22px;color:#B9C4E8">${y}年${m}月 · Check-in</span></h1>
+      <button class="btn" data-f data-key="prev" data-action="calMove" data-arg="-1">◀ 上个月</button>
+      <button class="btn" data-f data-key="next" data-action="calMove" data-arg="1">下个月 ▶</button></div>
+    <div class="cal"><div class="wk">${['一', '二', '三', '四', '五', '六', '日'].map(w => `<div>${w}</div>`).join('')}</div>
+      <div class="days">${cells}</div></div>
+    <div class="cside">
+      <div class="stat"><div class="k">🔥 连续打卡 Streak</div><div class="v">${streak()} <small>天</small></div></div>
+      <div class="stat"><div class="k">⏱ 本周观看（周一起）</div><div class="v">${Math.round(weekSeconds() / 60)} <small>分钟 · 近7天 ${Math.round(last7Seconds() / 60)} 分钟</small></div></div>
+      <div class="stat"><div class="k">🗓 本月打卡</div><div class="v">${monthDays} <small>天 · ${monthEps} 集</small></div></div>
+      <div class="stat" id="dayDetail" style="min-height:92px"></div>
+    </div>`;
+};
+function updateDayDetail(ds) {
+  const el = $('#dayDetail'); if (!el) return;
+  const d = parseD(ds), h = state.history[ds];
+  el.innerHTML = `<div class="k">${d.getMonth() + 1}月${d.getDate()}日 星期${WEEK[d.getDay()]}${ds === TODAY ? '（今天）' : ''}</div>
+    <div style="font-size:22px;font-weight:800;margin-top:4px">${h && h.eps ? `${STICKERS[d.getDate() % STICKERS.length]} 看了 ${h.eps} 集 · ${Math.round(h.sec / 60)} 分钟` : '还没有贴纸'}</div>`;
+}
+
+/* ---------- PARENT GATE ---------- */
+let gateQ = null, holdT = null, holdStart = 0;
+RENDER.gate = () => {
+  const a = 2 + Math.floor(Math.random() * 7), b = 2 + Math.floor(Math.random() * 7), ans = a + b;
+  const opts = new Set([ans]); while (opts.size < 4) opts.add(Math.max(2, ans + Math.floor(Math.random() * 9) - 4));
+  gateQ = { ans };
+  $('#gate').innerHTML = `
+    <button class="btn" style="position:absolute;left:40px;top:22px" data-f data-default data-key="back" data-action="back">⬅ 返回</button>
+    <div class="gate" id="gateBox"><div style="font-size:60px">🔒</div>
+      <h1>家长专区 · Parents only</h1>
+      <div style="color:#B9C4E8;font-size:20px">请回答问题，或长按 OK 键 3 秒</div>
+      <div class="q">${a} + ${b} = ?</div>
+      <div class="opts">${[...opts].sort(() => Math.random() - .5).map((v, i) =>
+        `<div class="opt" data-f data-action="answer" data-arg="${v}">${v}</div>`).join('')}</div>
+      <div class="hold" data-f data-hold><div class="fillh" id="holdFill"></div><span>✋ 长按 OK 3 秒进入</span></div>
+    </div>`;
+};
+function startHold() {
+  if (holdT) return; holdStart = performance.now();
+  holdT = setInterval(() => {
+    const p = Math.min(1, (performance.now() - holdStart) / 3000), f = $('#holdFill');
+    if (f) f.style.width = p * 100 + '%';
+    if (p >= 1) { cancelHold(); replaceTop('parent'); }
+  }, 50);
+}
+function cancelHold() { if (!holdT) return; clearInterval(holdT); holdT = null; const f = $('#holdFill'); if (f) f.style.width = '0'; }
+
+/* ---------- PARENT SETTINGS ---------- */
+const SETTINGS = [
+  { k: 'dailyLimit', label: '每日集数上限', sub: 'Daily limit', min: 1, max: 6, step: 1, fmt: v => v + ' 集' },
+  { k: 'threshold', label: '完成判定阈值', sub: '看到多少算看完', min: 50, max: 100, step: 5, fmt: v => v + '%' },
+  { k: 'masterStars', label: '“熟了”所需次数', sub: 'Stars to master', min: 3, max: 10, step: 1, fmt: v => v + ' 次' },
+  { k: 'playlistSize', label: '本周片单数量', sub: 'Playlist size', min: 3, max: 5, step: 1, fmt: v => v + ' 集' },
+  { k: 'autoplay', label: '自动播放下一集', sub: '5 秒倒计时', bool: true, fmt: v => v ? '开 ON' : '关 OFF' },
+  { k: 'speed', label: '演示加速倍数', sub: '仅原型演示', opts: [1, 10, 30, 60], fmt: v => '×' + v },
+];
+RENDER.parent = () => {
+  const counts = l => SERIES.filter(s => s.lang === l);
+  $('#parent').innerHTML = `
+    <div class="chead"><button class="btn" data-f data-key="back" data-action="back">⬅ 返回</button>
+      <h1>⚙️ 家长设置 <span style="font-size:22px;color:#B9C4E8">Parent settings · ⬅➡ 调整</span></h1></div>
+    <div class="plist">
+      ${SETTINGS.map((d, i) => `<div class="set flat" data-f data-key="set-${d.k}" data-setting="${d.k}" ${i === 0 ? 'data-default' : ''} data-action="stepUp" data-arg="${d.k}">
+        ${d.label}<small>${d.sub}</small>
+        <div class="val"><span class="arrow" data-step="-1">◀</span><b id="val-${d.k}">${d.fmt(state.settings[d.k])}</b><span class="arrow" data-step="1">▶</span></div></div>`).join('')}
+      <div class="pbtns"><button class="btn danger" data-f data-key="reset" data-action="reset">🔄 重置演示数据</button>
+        <button class="btn" data-f data-key="home" data-action="home">🏠 回到首页</button></div>
+    </div>
+    <div class="pinfo"><h3>📂 媒体库扫描</h3>
+      <div class="mono">${esc(ROOT)}/</div>
+      ${Object.entries(LANG).map(([l, L]) => `<div class="mono">├─ ${L.folder}/</div>` +
+        counts(l).map(s => `<div class="mono">│&nbsp;&nbsp;├─ ${esc(s.folder)}/ (${s.epIds.length})</div>`).join('')).join('')}
+      <h3 style="margin-top:12px">📊 今日</h3>
+      <div>已看 ${todayEps()}/${state.settings.dailyLimit} 集 · 连续 ${streak()} 天 · 本周 ${Math.round(weekSeconds() / 60)} 分钟</div>
+      <div style="color:#9FB0E0;font-size:15px;margin-top:6px">规则：观看 ≥ 阈值才 +1⭐；满“熟了”次数后移入复习，同系列下一集自动补进本周片单。</div>
+    </div>`;
+};
+function stepSetting(k, dir) {
+  const d = SETTINGS.find(x => x.k === k), s = state.settings;
+  if (d.bool) s[k] = !s[k];
+  else if (d.opts) { const i = d.opts.indexOf(s[k]); s[k] = d.opts[(i + dir + d.opts.length) % d.opts.length]; }
+  else s[k] = Math.min(d.max, Math.max(d.min, s[k] + dir * d.step));
+  refreshPlaylist(); save();
+  const v = $('#val-' + k); if (v) v.textContent = d.fmt(s[k]);
+}
+
+/* =====================================================================
+   5. ACTIONS (Enter / click on a focused element)
+   ===================================================================== */
+const ACTIONS = {
+  back: () => back(),
+  home: () => goHome(),
+  tab: k => { homeTab = k; renderHomeSeries(); },
+  series: sid => show('series', { sid }),
+  play: id => startPlay(id),
+  calendar: () => show('calendar'),
+  calMove: d => { calYM.m += +d; if (calYM.m < 1) { calYM.m = 12; calYM.y--; } if (calYM.m > 12) { calYM.m = 1; calYM.y++; } render('calendar', {}); },
+  gate: () => show('gate'),
+  answer: v => {
+    if (+v === gateQ.ans) { replaceTop('parent'); return; }
+    toast('答错啦，再试一次'); render('gate', {});
+    const g = $('#gateBox'); g.classList.add('shake');
+  },
+  stepUp: k => stepSetting(k, 1),
+  reset: () => { state = seedState(); save(); toast('演示数据已重置 ✅'); render('parent', {}); },
+  modalOk: () => modalCtx && modalCtx.onOk && modalCtx.onOk(),
+  modalCancel: () => modalCtx && modalCtx.onCancel && modalCtx.onCancel(),
+};
+
+/* =====================================================================
+   6. BOOT
+   ===================================================================== */
+function fit() { stage.style.setProperty('--s', Math.min(innerWidth / 1280, innerHeight / 720)); }
+addEventListener('resize', fit); fit();
+refreshPlaylist(); save();
+goHome();
+// expose for debugging / automated tests
+window.__kidtv = { get state() { return state; }, get screen() { return cur; }, get focusKey() { return focusEl && focusEl.dataset.key; }, EPS };
+</script>
+</body>
+</html>

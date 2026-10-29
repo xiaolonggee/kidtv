@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV 启动器横幅（320x180）：深蓝底 + 黄色圆点徽标 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:startColor="#13214F" android:endColor="#0B1433" android:angle="270" />
+        </shape>
+    </item>
+    <item android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="#FFD400" />
+            <size android:width="64dp" android:height="64dp" />
+        </shape>
+    </item>
+</layer-list>

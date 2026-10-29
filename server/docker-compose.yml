@@ -1,0 +1,17 @@
+# 宝宝动画屋服务端 · 一条命令启动：docker compose up -d
+# 管理后台: http://<主机IP>:8600/admin/   默认密码 admin123（务必修改！）
+services:
+  kidtv:
+    build: .
+    ports:
+      - "8600:8600"
+    environment:
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      # 可选：用 Postgres 替代默认 SQLite
+      # - DATABASE_URL=postgresql+psycopg://user:pass@db:5432/kidtv
+    volumes:
+      - kidtv-data:/data        # 数据库 + 视频文件
+    restart: unless-stopped
+
+volumes:
+  kidtv-data:
