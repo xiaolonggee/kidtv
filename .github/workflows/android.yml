@@ -18,6 +18,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
+          cache-dependency-path: android/**/*.gradle.kts
       - name: Verify preinstalled SDK (never install or accept licenses)
         run: |
           test -f "$ANDROID_HOME/platforms/android-35/android.jar"
@@ -25,7 +27,7 @@ jobs:
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > android/local.properties
       - name: Test, lint and build unsigned release
         working-directory: android
-        run: ./gradlew --no-daemon -Dorg.gradle.workers.max=2 -Pandroid.builder.sdkDownload=false -PunsignedRelease=true --continue assembleRelease lintRelease testDebugUnitTest
+        run: ./gradlew --no-daemon -Dorg.gradle.workers.max=2 -Pandroid.builder.sdkDownload=false -PunsignedRelease=true -Proborazzi.test.record=true --continue assembleRelease lintRelease testDebugUnitTest
       - uses: actions/upload-artifact@v4
         if: always()
         with:

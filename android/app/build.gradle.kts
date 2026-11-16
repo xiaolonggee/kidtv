@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -101,7 +103,7 @@ dependencies {
 
 // Bound JVM UI tests so a focus/idle regression fails visibly instead of hanging CI.
 tasks.withType<Test>().configureEach {
-    timeout.set(java.time.Duration.ofMinutes(4))
+    timeout.set(Duration.ofMinutes(4))
     maxHeapSize = "1g"
     testLogging { events("started", "passed", "failed", "skipped") }
 }
