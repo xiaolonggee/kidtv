@@ -145,6 +145,8 @@ fun ParentScreen(vm: AppViewModel) {
                                 if (!vm.grantExtraEpisodesToday(extraCount)) {
                                     Toast.makeText(context, "请重新通过家长确认", Toast.LENGTH_SHORT).show()
                                 }
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
                             } catch (e: Exception) {
                                 Toast.makeText(context, "保存失败，请重试", Toast.LENGTH_SHORT).show()
                             } finally { granting = false }

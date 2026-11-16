@@ -230,22 +230,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun grantExtraEpisodesToday(amount: Int): Boolean {
         if (backstack.value.lastOrNull() != Screen.Parent || !parentAllowanceAuthorized || amount !in 1..20) return false
         parentAllowanceAuthorized = false // synchronous guard against repeated OK events
+        // Read the actual date at confirmation, not the timer's potentially stale date.
+        val today = LocalDate.now(TZ).toString()
         try {
-            // Read the real date at confirmation, not the timer's potentially stale date.
-            val today = LocalDate.now(TZ).toString()
-            var expectedBonus = 0
-            settingsRepo.update {
-                it.withExtraEpisodesToday(today, amount).also { next -> expectedBonus = next.extraEpisodes }
-            }
-            todayDate.value = LocalDate.parse(today)
-            // Wait for the UI-facing limit before returning to the home screen.
-            settings.first { it.extraEpisodesDate == today && it.extraEpisodes == expectedBonus }
-            if (backstack.value.lastOrNull() == Screen.Parent) goHome()
-            return true
+            settingsRepo.update { it.withExtraEpisodesToday(today, amount) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Cancellation may race a committed DataStore write. Never permit a
+            // second batch merely because the caller stopped waiting.
+            throw e
         } catch (e: Exception) {
             parentAllowanceAuthorized = backstack.value.lastOrNull() == Screen.Parent
             throw e
         }
+        // Persistence succeeded. Do not wait indefinitely for a UI collector or
+        // restore authorization after this point; the settings flow refreshes itself.
+        todayDate.value = LocalDate.parse(today)
+        if (backstack.value.lastOrNull() == Screen.Parent) goHome()
+        return true
     }
 
     /** 连续打卡天数：今天没看则从昨天起算，与原型一致。 */

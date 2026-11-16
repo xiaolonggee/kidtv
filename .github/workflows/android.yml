@@ -22,7 +22,7 @@ jobs:
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > android/local.properties
       - name: Test, lint and build unsigned release
         working-directory: android
-        run: ./gradlew --no-daemon -Dorg.gradle.workers.max=2 -Pandroid.builder.sdkDownload=false -PunsignedRelease=true testDebugUnitTest lintRelease assembleRelease
+        run: ./gradlew --no-daemon -Dorg.gradle.workers.max=2 -Pandroid.builder.sdkDownload=false -PunsignedRelease=true --continue testDebugUnitTest lintRelease assembleRelease
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -30,5 +30,7 @@ jobs:
           path: |
             android/app/build/outputs/apk/release/*unsigned.apk
             android/app/build/reports/tests/
+            android/app/build/test-results/
+            android/app/build/outputs/roborazzi/
             android/app/build/reports/lint-results-release.*
           if-no-files-found: warn
