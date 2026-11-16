@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config
 class SeriesNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var vm: AppViewModel
-    @Before fun setup() = runBlocking {
+    @Before fun setup() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         vm = AppViewModel(app)
         repeat(30) { compose.waitForIdle(); Thread.sleep(20) }
