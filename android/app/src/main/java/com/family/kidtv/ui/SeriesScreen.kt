@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import com.family.kidtv.AppViewModel
 import com.family.kidtv.Screen
 import com.family.kidtv.data.Episode
+import com.family.kidtv.data.Series
 
 private fun mmss(sec: Long): String = "%02d:%02d".format(sec / 60, sec % 60)
 
@@ -54,7 +55,18 @@ fun SeriesScreen(vm: AppViewModel, language: String, folder: String) {
     val s = library.series.firstOrNull { it.language == language && it.folder == folder } ?: run {
         vm.goHome(); return
     }
-    val ms = settings.masterStars
+    SeriesContent(s, library.root, counts, settings.masterStars, covers,
+        onBack = { vm.pop() }, onEpisode = { vm.push(Screen.EpisodeDetail(it)) })
+}
+
+/** Presentation kept separate from persistence for deterministic TV input tests. */
+@Composable
+internal fun SeriesContent(
+    s: Series, libraryRoot: String, counts: Map<String, Int>, ms: Int,
+    covers: Map<String, String>, onBack: () -> Unit, onEpisode: (String) -> Unit,
+) {
+    val language = s.language
+    val folder = s.folder
     val learning = s.episodes.filter { (counts[it.key] ?: 0) < ms }
     val review = s.episodes.filter { (counts[it.key] ?: 0) >= ms }
     var selectedTab by rememberSaveable(language, folder) { mutableIntStateOf(0) }
@@ -62,14 +74,17 @@ fun SeriesScreen(vm: AppViewModel, language: String, folder: String) {
     val reviewScroll = rememberLazyGridState()
     val tabs = remember { List(2) { FocusRequester() } }
     // Initial focus belongs to the permanent tab row, never a recycled grid item.
-    LaunchedEffect(language, folder) { tabs[selectedTab].requestFocus() }
+    LaunchedEffect(language, folder) {
+        kotlinx.coroutines.delay(60) // wait for attachment/input mode on TV startup
+        tabs[selectedTab].requestFocus()
+    }
     val visibleEpisodes = if (selectedTab == 0) learning else review
     val episodeFocus = remember(s.episodes) { s.episodes.associate { it.key to FocusRequester() } }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 14.dp)) {
         // 头部
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TvButton("⬅ 返回", onClick = { vm.pop() })
+            TvButton("⬅ 返回", onClick = onBack)
             Spacer(Modifier.width(16.dp))
             Art(s.displayName, s.cnName, s.coverUri, Modifier.size(86.dp, 72.dp), emojiSize = 40.sp, shape = RoundedCornerShape(16.dp))
             Spacer(Modifier.width(14.dp))
@@ -82,7 +97,7 @@ fun SeriesScreen(vm: AppViewModel, language: String, folder: String) {
                     }
                 }
                 Text(
-                    "📁 ${library.root}/${s.language}/${s.folder}/ → ${s.episodes.size} 个视频",
+                    "📁 ${libraryRoot}/${s.language}/${s.folder}/ → ${s.episodes.size} 个视频",
                     color = C.PathText, fontSize = 11.sp,
                     modifier = Modifier
                         .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
@@ -142,7 +157,7 @@ fun SeriesScreen(vm: AppViewModel, language: String, folder: String) {
                     seriesName = s.displayName, coverUri = covers[ep.key] ?: s.coverUri,
                     modifier = Modifier.focusRequester(episodeFocus.getValue(ep.key)).focusProperties {
                         if (visibleEpisodes.indexOf(ep) < 5) up = tabs[selectedTab]
-                    }) { vm.push(Screen.EpisodeDetail(ep.key)) }
+                    }) { onEpisode(ep.key) }
             }
         }
     }

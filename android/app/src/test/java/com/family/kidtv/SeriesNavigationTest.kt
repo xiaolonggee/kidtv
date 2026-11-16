@@ -6,7 +6,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import com.family.kidtv.data.*
-import com.family.kidtv.ui.SeriesScreen
+import com.family.kidtv.ui.SeriesContent
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import org.junit.Before
@@ -23,6 +23,7 @@ import org.robolectric.annotation.Config
 class SeriesNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var vm: AppViewModel
+    private val displayedCounts = androidx.compose.runtime.mutableStateOf<Map<String, Int>>(emptyMap())
     @Before fun setup() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         vm = AppViewModel(app)
@@ -38,9 +39,13 @@ class SeriesNavigationTest {
             androidx.compose.runtime.SideEffect {
                 inputMode.requestInputMode(androidx.compose.ui.input.InputMode.Keyboard)
             }
-            SeriesScreen(vm, "English", "Test")
+            SeriesContent(vm.library.value.series.first(), "/test", displayedCounts.value, 5, emptyMap(), {}, {})
         }
+        compose.mainClock.advanceTimeBy(100)
         compose.waitForIdle()
+        // Simulate entering the page with a remote, independently of Activity window focus.
+        compose.onNodeWithText("📖 学习中 · 25 集").performSemanticsAction(
+            androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
     }
     @Test fun reviewIsPermanentRightHandTabAndEmptyStateWorks() {
         compose.onNodeWithText("📖 学习中 · 25 集").assertIsDisplayed().assertIsFocused()
@@ -58,15 +63,8 @@ class SeriesNavigationTest {
         compose.onNodeWithTag("episode-English/Test/21.mp4").assertIsFocused()
     }
     @Test fun masteredEpisodeMovesToReviewWithoutDeletingIt() {
-        val app = ApplicationProvider.getApplicationContext<Application>()
-        runBlocking {
-            repeat(5) { n -> KidTvDb.get(app).dao().insertEvent(PlayEvent(
-                id = "review-navigation-$n", language = "English", series = "Test",
-                episodeKey = "English/Test/7.mp4", episodeNum = 7, title = "Episode 7",
-                watchedSec = 10, durationSec = 10, counted = true,
-                localDate = "2026-01-01", occurredAtMs = 0, synced = true)) }
-        }
-        compose.waitUntil(5000) { vm.plays("English/Test/7.mp4") >= 5 }
+        compose.runOnIdle { displayedCounts.value = mapOf("English/Test/7.mp4" to 5) }
+        compose.waitForIdle()
         compose.onNodeWithText("🔁 复习中 · 1 集").performClick()
         compose.onNodeWithText("Episode 7").assertIsDisplayed()
         org.junit.Assert.assertEquals(25, vm.library.value.series.first().episodes.size)
