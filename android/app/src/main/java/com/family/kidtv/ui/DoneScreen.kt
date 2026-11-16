@@ -27,7 +27,7 @@ import com.family.kidtv.AppViewModel
 import com.family.kidtv.GatePurpose
 import com.family.kidtv.Screen
 
-/** 今日上限已到：温柔的“明天再见” + 家长入口 / 再看一集（经家长门，当日一次性加额）。 */
+/** 今日上限已到：温柔的“明天再见” + 家长入口 / 家长加看（经家长门，当日一次性加额）。 */
 @Composable
 fun DoneScreen(vm: AppViewModel) {
     val context = LocalContext.current
@@ -67,12 +67,12 @@ fun DoneScreen(vm: AppViewModel) {
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             TvButton("🔒 家长设置", onClick = { vm.openGate(GatePurpose.ParentSettings) })
-            TvButton("➕ 再看一集", onClick = {
-                Toast.makeText(context, "需要家长确认后才能再看一集", Toast.LENGTH_SHORT).show()
+            TvButton("➕ 家长加看", onClick = {
+                Toast.makeText(context, "通过家长确认后，可选择额外加看几集", Toast.LENGTH_SHORT).show()
                 vm.openGate(GatePurpose.OneMoreEpisode)
             })
         }
         Spacer(Modifier.height(8.dp))
-        Text("「再看一集」只加今天一次，不会永久改每日上限", color = C.Muted, fontSize = 12.sp)
+        Text("选择今天额外加看几集，不会永久改每日上限", color = C.Muted, fontSize = 12.sp)
     }
 }

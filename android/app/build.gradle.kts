@@ -10,13 +10,14 @@ plugins {
 android {
     namespace = "com.family.kidtv"
     compileSdk = 35
+    buildToolsVersion = "35.0.0"
 
     defaultConfig {
         applicationId = "com.family.kidtv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.5.2-ux"
+        versionCode = 12
+        versionName = "1.5.5-review-parent"
     }
 
     signingConfigs {
@@ -32,7 +33,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            // CI may explicitly build an unsigned artifact; it cannot upgrade the TV yet.
+            signingConfig = if (providers.gradleProperty("unsignedRelease").orNull == "true") null
+                else signingConfigs.getByName("release")
         }
     }
 

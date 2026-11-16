@@ -96,12 +96,15 @@ class MainActivity : ComponentActivity() {
 fun App(vm: AppViewModel) {
     val backstack by vm.backstack.collectAsState()
     val screen = backstack.last()
+    val seriesState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
 
     Box(Modifier.fillMaxSize().background(C.BgBrush)) {
         BackHandler(enabled = backstack.size > 1) { vm.pop() }
         when (screen) {
             is Screen.Home -> HomeScreen(vm)
-            is Screen.SeriesPage -> SeriesScreen(vm, screen.language, screen.folder)
+            is Screen.SeriesPage -> seriesState.SaveableStateProvider("${screen.language}/${screen.folder}") {
+                SeriesScreen(vm, screen.language, screen.folder)
+            }
             is Screen.EpisodeDetail -> EpisodeDetailScreen(vm, screen.episodeKey)
             is Screen.Player -> PlayerScreen(vm, screen.episodeKey)
             is Screen.Calendar -> CalendarScreen(vm)

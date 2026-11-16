@@ -13,9 +13,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,7 +57,14 @@ fun SeriesScreen(vm: AppViewModel, language: String, folder: String) {
     val ms = settings.masterStars
     val learning = s.episodes.filter { (counts[it.key] ?: 0) < ms }
     val review = s.episodes.filter { (counts[it.key] ?: 0) >= ms }
-    val firstNew = learning.firstOrNull()
+    var selectedTab by rememberSaveable(language, folder) { mutableIntStateOf(0) }
+    val learningScroll = rememberLazyGridState()
+    val reviewScroll = rememberLazyGridState()
+    val tabs = remember { List(2) { FocusRequester() } }
+    // Initial focus belongs to the permanent tab row, never a recycled grid item.
+    LaunchedEffect(language, folder) { tabs[selectedTab].requestFocus() }
+    val visibleEpisodes = if (selectedTab == 0) learning else review
+    val episodeFocus = remember(s.episodes) { s.episodes.associate { it.key to FocusRequester() } }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 14.dp)) {
         // 头部
@@ -80,60 +98,68 @@ fun SeriesScreen(vm: AppViewModel, language: String, folder: String) {
         }
         Spacer(Modifier.height(10.dp))
 
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            listOf("📖 学习中 · ${learning.size} 集", "🔁 复习中 · ${review.size} 集").forEachIndexed { index, title ->
+                TvButton(title, onClick = { selectedTab = index }, primary = selectedTab == index,
+                    modifier = Modifier.weight(1f).focusRequester(tabs[index])
+                        .onFocusChanged { if (it.isFocused) selectedTab = index }
+                        .onPreviewKeyEvent { event ->
+                            if (event.key == Key.DirectionDown && visibleEpisodes.isNotEmpty()) {
+                                if (event.type == KeyEventType.KeyDown) {
+                                    val scroll = if (selectedTab == 0) learningScroll else reviewScroll
+                                    val ep = visibleEpisodes.getOrNull(scroll.firstVisibleItemIndex)
+                                    ep?.let { episodeFocus[it.key]?.requestFocus() }
+                                }
+                                return@onPreviewKeyEvent true
+                            }
+                            val target = when (event.key) {
+                                Key.DirectionLeft -> 0
+                                Key.DirectionRight -> 1
+                                else -> return@onPreviewKeyEvent false
+                            }
+                            if (event.type == KeyEventType.KeyDown) tabs[target].requestFocus()
+                            true
+                        })
+            }
+        }
+        Text("左右切换分类 · 向下选择集数 · 熟了的视频在「复习中」", color = C.Muted,
+            fontSize = 12.sp, modifier = Modifier.padding(vertical = 10.dp))
+        if (visibleEpisodes.isEmpty()) {
+            Text(if (selectedTab == 0) "全部都熟了，去右侧「复习中」再看吧！🎉"
+                else "还没有熟了的集数，学会的视频会自动出现在这里。",
+                color = C.Muted, fontSize = 17.sp, modifier = Modifier.padding(20.dp))
+        }
         LazyVerticalGrid(
             columns = GridCells.Fixed(5),
+            state = if (selectedTab == 0) learningScroll else reviewScroll,
+            modifier = Modifier.weight(1f).testTag("series-episodes"),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(6.dp),
         ) {
-            item(span = { GridItemSpan(5) }) {
-                GroupHead("📖 学习中", "Learning · ${learning.size} 集")
-            }
-            if (learning.isEmpty()) item(span = { GridItemSpan(5) }) {
-                Text("全部都熟了，太棒啦！🎉", color = C.Muted, fontSize = 15.sp)
-            }
-            items(learning, key = { it.key }) { ep ->
-                EpisodeCard(ep, counts[ep.key] ?: 0, ms, mastered = false,
+            items(visibleEpisodes, key = { it.key }) { ep ->
+                EpisodeCard(ep, counts[ep.key] ?: 0, ms, mastered = selectedTab == 1,
                     seriesName = s.displayName, coverUri = covers[ep.key] ?: s.coverUri,
-                    first = ep == firstNew) { vm.push(Screen.EpisodeDetail(ep.key)) }
-            }
-            item(span = { GridItemSpan(5) }) {
-                GroupHead("🔁 复习", "Review · 熟了 ${review.size} 集")
-            }
-            if (review.isEmpty()) item(span = { GridItemSpan(5) }) {
-                Text("还没有“熟了”的集数，继续加油！", color = C.Muted, fontSize = 15.sp)
-            }
-            items(review, key = { it.key }) { ep ->
-                EpisodeCard(ep, counts[ep.key] ?: 0, ms, mastered = true,
-                    seriesName = s.displayName, coverUri = covers[ep.key] ?: s.coverUri,
-                    first = false) { vm.push(Screen.EpisodeDetail(ep.key)) }
+                    modifier = Modifier.focusRequester(episodeFocus.getValue(ep.key)).focusProperties {
+                        if (visibleEpisodes.indexOf(ep) < 5) up = tabs[selectedTab]
+                    }) { vm.push(Screen.EpisodeDetail(ep.key)) }
             }
         }
     }
 }
 
 @Composable
-private fun GroupHead(title: String, sub: String) {
-    Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 6.dp)) {
-        Text(title, color = C.Text, fontSize = 17.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.width(8.dp))
-        Text(sub, color = C.Muted, fontSize = 13.sp)
-    }
-}
-
-@Composable
 private fun EpisodeCard(
     ep: Episode, plays: Int, max: Int, mastered: Boolean,
-    seriesName: String, coverUri: String? = null, first: Boolean, onClick: () -> Unit,
+    seriesName: String, coverUri: String? = null, modifier: Modifier = Modifier, onClick: () -> Unit,
 ) {
     val (c1, _) = C.seriesColors(seriesName)
     Focusable(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(116.dp),
+        modifier = modifier.fillMaxWidth().height(116.dp).testTag("episode-${ep.key}"),
         shape = RoundedCornerShape(18.dp),
         background = if (mastered) C.MasteredBg else C.Panel,
         focusScale = 1.05f,
-        requestInitialFocus = first,
     ) {
         Box(Modifier.fillMaxSize().padding(10.dp)) {
             Art(ep.title, ep.cnTitle, coverUri,

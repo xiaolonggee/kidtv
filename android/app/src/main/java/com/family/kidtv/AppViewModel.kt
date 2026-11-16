@@ -17,6 +17,7 @@ import com.family.kidtv.data.ThumbnailService
 import com.family.kidtv.data.ScanOutcome
 import com.family.kidtv.data.PlaybackProgress
 import com.family.kidtv.data.Settings
+import com.family.kidtv.data.withExtraEpisodesToday
 import com.family.kidtv.storage.StoragePermissions
 import com.family.kidtv.storage.StorageProbe
 import com.family.kidtv.util.CrashReporter
@@ -215,24 +216,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         push(Screen.Gate)
     }
 
+    private var parentAllowanceAuthorized = false
+
     fun onGateUnlocked() {
-        when (gatePurpose) {
-            GatePurpose.ParentSettings -> replaceTop(Screen.Parent)
-            GatePurpose.OneMoreEpisode -> {
-                grantOneMoreToday()
-                goHome()
-            }
-        }
+        // A held OK key and an answer click must not unlock twice.
+        if (backstack.value.lastOrNull() != Screen.Gate) return
+        parentAllowanceAuthorized = true
+        replaceTop(Screen.Parent)
         gatePurpose = GatePurpose.ParentSettings
     }
 
-    fun grantOneMoreToday() {
-        viewModelScope.launch {
-            val today = todayStr()
+    /** One confirmation per parent session; never changes dailyLimit or play history. */
+    suspend fun grantExtraEpisodesToday(amount: Int): Boolean {
+        if (backstack.value.lastOrNull() != Screen.Parent || !parentAllowanceAuthorized || amount !in 1..20) return false
+        parentAllowanceAuthorized = false // synchronous guard against repeated OK events
+        try {
+            // Read the real date at confirmation, not the timer's potentially stale date.
+            val today = LocalDate.now(TZ).toString()
+            var expectedBonus = 0
             settingsRepo.update {
-                val cur = if (it.extraEpisodesDate == today) it.extraEpisodes else 0
-                it.copy(extraEpisodesDate = today, extraEpisodes = cur + 1)
+                it.withExtraEpisodesToday(today, amount).also { next -> expectedBonus = next.extraEpisodes }
             }
+            todayDate.value = LocalDate.parse(today)
+            // Wait for the UI-facing limit before returning to the home screen.
+            settings.first { it.extraEpisodesDate == today && it.extraEpisodes == expectedBonus }
+            if (backstack.value.lastOrNull() == Screen.Parent) goHome()
+            return true
+        } catch (e: Exception) {
+            parentAllowanceAuthorized = backstack.value.lastOrNull() == Screen.Parent
+            throw e
         }
     }
 

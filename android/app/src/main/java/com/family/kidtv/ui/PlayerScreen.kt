@@ -27,8 +27,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,6 +63,12 @@ import com.family.kidtv.Screen
 import com.family.kidtv.data.Episode
 import kotlinx.coroutines.launch
 
+internal fun seekTarget(positionMs: Long, durationMs: Long, deltaMs: Long): Long {
+    val target = (positionMs + deltaMs).coerceAtLeast(0L)
+    // Unknown duration must not invent a seekable range.
+    return if (durationMs > 0L) target.coerceAtMost((durationMs - 1L).coerceAtLeast(0L)) else positionMs.coerceAtLeast(0L)
+}
+
 private fun mmss(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)
     return "%02d:%02d".format(s / 60, s % 60)
@@ -74,6 +82,16 @@ private sealed class Phase {
 
 @Composable
 fun PlayerScreen(vm: AppViewModel, episodeKey: String) {
+    var replaySession by remember(episodeKey) { mutableIntStateOf(0) }
+    // Replaying the same episode does not change its navigation key. A fresh
+    // session must reset finished/phase/timers and release the prior player.
+    key(episodeKey, replaySession) {
+        PlayerSession(vm, episodeKey, allowResume = replaySession == 0, onReplay = { replaySession++ })
+    }
+}
+
+@Composable
+private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boolean, onReplay: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings by vm.settings.collectAsState()
@@ -85,7 +103,7 @@ fun PlayerScreen(vm: AppViewModel, episodeKey: String) {
     val ep = library.episodeByKey[episodeKey] ?: run { vm.goHome(); return }
 
     // 进入时已到上限 → 温柔拦截
-    LaunchedEffect(Unit) { if (vm.limitReached()) vm.replaceTop(Screen.Done) }
+    LaunchedEffect(episodeKey) { if (vm.limitReached()) vm.replaceTop(Screen.Done) }
 
     var phase by remember(episodeKey) { mutableStateOf<Phase>(Phase.Playing) }
     var watchedMs by remember(episodeKey) { mutableLongStateOf(0L) }
@@ -104,7 +122,7 @@ fun PlayerScreen(vm: AppViewModel, episodeKey: String) {
         }
     }
     LaunchedEffect(episodeKey) {
-        val prog = vm.loadPlaybackProgress(episodeKey)
+        val prog = if (allowResume) vm.loadPlaybackProgress(episodeKey) else null
         if (prog != null && prog.positionMs > 1_500L && !resumeApplied) {
             player.seekTo(prog.positionMs)
             watchedMs = prog.passWatchedMs.coerceAtLeast(0L)
@@ -164,6 +182,15 @@ fun PlayerScreen(vm: AppViewModel, episodeKey: String) {
         }
     }
 
+    fun seekBy(deltaMs: Long) {
+        if (finished || phase !is Phase.Playing || !player.isCurrentMediaItemSeekable) return
+        val duration = player.duration.takeIf { it > 0L } ?: durationMs
+        val target = seekTarget(player.currentPosition, duration, deltaMs)
+        player.seekTo(target)
+        positionMs = target
+        // Seeking never changes watchedMs; only actual playing time counts.
+    }
+
     // 实际播放计时（只在真正播放时累计，快进不算）+ 进度刷新
     LaunchedEffect(episodeKey) {
         var sinceSave = 0L
@@ -187,7 +214,7 @@ fun PlayerScreen(vm: AppViewModel, episodeKey: String) {
     BackHandler(enabled = phase is Phase.Playing) { finishPlay(false) }
 
     val playerFocus = remember { FocusRequester() }
-    LaunchedEffect(phase) { if (phase is Phase.Playing) runCatching { playerFocus.requestFocus() } }
+    LaunchedEffect(episodeKey, phase) { if (phase is Phase.Playing) runCatching { playerFocus.requestFocus() } }
 
     Box(
         Modifier
@@ -199,6 +226,8 @@ fun PlayerScreen(vm: AppViewModel, episodeKey: String) {
                 if (phase !is Phase.Playing || finished) return@onKeyEvent false
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
+                    Key.DirectionLeft, Key.MediaRewind -> { seekBy(-10_000L); true }
+                    Key.DirectionRight, Key.MediaFastForward -> { seekBy(10_000L); true }
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Spacebar,
                     Key.MediaPlayPause,
                     -> { if (player.isPlaying) player.pause() else player.play(); true }
@@ -206,17 +235,24 @@ fun PlayerScreen(vm: AppViewModel, episodeKey: String) {
                 }
             },
     ) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    useController = false
-                    this.player = player
-                    isFocusable = false
-                    isFocusableInTouchMode = false
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-        )
+        // ExoPlayer is recreated for each episode. Give its surface the same
+        // lifetime and explicitly rebind in update, otherwise an AndroidView
+        // retained by Compose can keep rendering the released previous player.
+        key(player) {
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        useController = false
+                        this.player = player
+                        isFocusable = false
+                        isFocusableInTouchMode = false
+                    }
+                },
+                update = { view -> if (view.player !== player) view.player = player },
+                onRelease = { view -> view.player = null },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
 
         // ------- 顶部信息条 -------
         Row(
@@ -266,7 +302,7 @@ fun PlayerScreen(vm: AppViewModel, episodeKey: String) {
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (playing) "⏸" else "▶", color = Color.White, fontSize = 28.sp)
+                Text("◀ 快退 10秒   ${if (playing) "⏸ 暂停" else "▶ 播放"} / OK   快进 10秒 ▶", color = Color.White, fontSize = 18.sp)
                 Spacer(Modifier.width(16.dp))
                 Text(
                     "${mmss(positionMs)} / ${mmss(durationMs)}",
@@ -284,7 +320,7 @@ fun PlayerScreen(vm: AppViewModel, episodeKey: String) {
                     if (vm.limitReached()) { vm.goHome(); vm.push(Screen.Done); return@CelebrationOverlay }
                     when (val action = vm.afterEpisodeAction(ep.key)) {
                         is AfterEpisodeAction.NextCountdown -> phase = Phase.Countdown(action.next)
-                        is AfterEpisodeAction.Replay -> vm.replaceTop(Screen.Player(ep.key))
+                        is AfterEpisodeAction.Replay -> onReplay()
                         is AfterEpisodeAction.Stop -> vm.pop()
                     }
                 },

@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,10 +51,13 @@ fun Focusable(
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) focusScale else 1f, label = "focus-scale")
     val fr = remember { FocusRequester() }
+    // Lazy grids dispose off-screen cards. Save the initial-focus flag with the
+    // keyed item so scrolling it back into composition cannot steal focus.
+    var initialFocusRequested by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(requestInitialFocus) {
-        if (requestInitialFocus) {
+        if (requestInitialFocus && !initialFocusRequested) {
             kotlinx.coroutines.delay(60)
-            runCatching { fr.requestFocus() }
+            runCatching { fr.requestFocus() }.onSuccess { initialFocusRequested = true }
         }
     }
     Box(

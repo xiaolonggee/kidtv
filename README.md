@@ -25,6 +25,13 @@
 
 ---
 
+## 1.5.5-review-parent 更新
+
+- 系列页顶部固定并列的「学习中」「复习中」页签。遥控器左右切换，向下进入列表；两类列表各自保存滚动位置，进入详情后返回仍保留分类。
+- 家长验证后可一次加看 1–20 集，提供 1 / 3 / 5 / 10 集快捷选项。选中不会改变额度，确认才生效，仅当天有效，不改变永久每日上限或观看记录。
+- 保留遥控器左右快退/快进 10 秒；修复切集时播放器画面绑定、同集重播重置以及列表初始焦点重复请求。
+- 升级安装必须使用与旧包相同的私钥签名。仓库不包含私钥；未签名构建只能作为待签名产物，不应卸载旧版以绕过签名不匹配，否则会丢失本地记录。
+
 ## 一、U 盘视频怎么放（重要！）
 
 在 U 盘（或电视内置存储）根目录建一个 **`启蒙视频`** 文件夹，按
@@ -83,7 +90,7 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew assembleRelease      # 签名发布包 → app/build/outputs/apk/release/app-release.apk
 ```
 
-发布包用仓库里自带的家庭自用密钥 `android/keystore/kidtv-release.jks`
+发布包使用单独保管、未提交仓库的家庭自用密钥 `android/keystore/kidtv-release.jks`
 （口令 `kidtv-family`，可用环境变量 `KIDTV_KEYSTORE_PASSWORD` 覆盖）签名。
 想换成自己的密钥：
 

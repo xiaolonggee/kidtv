@@ -90,6 +90,8 @@ fun ParentScreen(vm: AppViewModel) {
     val daily by vm.dailyStats.collectAsState()
     val today by vm.todayDate.collectAsState()
     var advancedOpen by remember { mutableStateOf(false) }
+    var extraCount by remember(today) { mutableStateOf(1) }
+    var granting by remember { mutableStateOf(false) }
 
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -121,6 +123,37 @@ fun ParentScreen(vm: AppViewModel) {
                 Text("⬅➡ 调整", color = C.Muted, fontSize = 13.sp)
             }
             Spacer(Modifier.height(2.dp))
+
+            Text("今天额外加看", color = C.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text("已额外加看 ${vm.bonusForToday()} 集 · 只对今天生效，明天恢复每日上限", color = C.Muted, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1, 3, 5, 10).forEach { count ->
+                    TvButton("${if (extraCount == count) "✓ " else ""}$count 集", onClick = {
+                        if (!granting) extraCount = count
+                    })
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                TvButton("－", onClick = { if (!granting) extraCount = (extraCount - 1).coerceAtLeast(1) })
+                Text("$extraCount 集", color = C.Text, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                TvButton("＋", onClick = { if (!granting) extraCount = (extraCount + 1).coerceAtMost(20) })
+                TvButton(if (granting) "保存中…" else "确认加看 $extraCount 集", primary = true, onClick = {
+                    if (!granting) {
+                        granting = true
+                        scope.launch {
+                            try {
+                                if (!vm.grantExtraEpisodesToday(extraCount)) {
+                                    Toast.makeText(context, "请重新通过家长确认", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "保存失败，请重试", Toast.LENGTH_SHORT).show()
+                            } finally { granting = false }
+                        }
+                    }
+                })
+            }
+            Text("确认前不增加额度；不想加看可直接返回。每次可加 1–20 集。", color = C.Muted, fontSize = 12.sp)
+            Spacer(Modifier.height(4.dp))
 
             Text("常用", color = C.Muted, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             BASIC_DEFS.forEach { def ->

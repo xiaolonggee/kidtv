@@ -74,7 +74,7 @@ fun GateScreen(vm: AppViewModel) {
         val purpose = vm.gatePurpose
         Text(
             if (purpose == com.family.kidtv.GatePurpose.OneMoreEpisode)
-                "再看一集需要家长确认" else "家长专区 · Parents only",
+                "加看集数需要家长确认" else "家长专区 · Parents only",
             color = C.Text, fontSize = 26.sp, fontWeight = FontWeight.Black,
         )
         Text("请回答问题，或长按 OK 键 3 秒", color = C.Muted, fontSize = 15.sp)
