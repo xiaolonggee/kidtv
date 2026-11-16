@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.family.kidtv.data.*
 import com.family.kidtv.ui.SeriesScreen
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -17,7 +18,8 @@ import org.robolectric.annotation.Config
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w960dp-h540dp-land-xhdpi")
 class SeriesNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var vm: AppViewModel
@@ -62,6 +64,29 @@ class SeriesNavigationTest {
         compose.onNodeWithText("🔁 复习中 · 1 集").performClick()
         compose.onNodeWithText("Episode 7").assertIsDisplayed()
         org.junit.Assert.assertEquals(25, vm.library.value.series.first().episodes.size)
+    }
+
+    @Test fun parentBatchRequiresGateAndCannotBeConfirmedTwice() = runBlocking {
+        val before = vm.settingsRepo.flow.first()
+        org.junit.Assert.assertFalse(vm.grantExtraEpisodesToday(3))
+        vm.openGate(GatePurpose.OneMoreEpisode)
+        vm.onGateUnlocked()
+        org.junit.Assert.assertTrue(vm.grantExtraEpisodesToday(3))
+        val saved = vm.settingsRepo.flow.first()
+        val date = java.time.LocalDate.now(TZ).toString()
+        val oldBonus = if (before.extraEpisodesDate == date) before.extraEpisodes.coerceAtLeast(0) else 0
+        org.junit.Assert.assertEquals(oldBonus + 3, saved.extraEpisodes)
+        org.junit.Assert.assertEquals(before.dailyLimit, saved.dailyLimit)
+        org.junit.Assert.assertFalse(vm.grantExtraEpisodesToday(3))
+        org.junit.Assert.assertEquals(saved, vm.settingsRepo.flow.first())
+    }
+    @Test fun leavingParentWithoutConfirmationAddsNothing() = runBlocking {
+        val before = vm.settingsRepo.flow.first()
+        vm.openGate(GatePurpose.OneMoreEpisode)
+        vm.onGateUnlocked()
+        vm.pop()
+        org.junit.Assert.assertFalse(vm.grantExtraEpisodesToday(5))
+        org.junit.Assert.assertEquals(before, vm.settingsRepo.flow.first())
     }
 
 }

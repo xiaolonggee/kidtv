@@ -46,6 +46,7 @@ private fun mmssDetail(ms: Long): String {
     return "%02d:%02d".format(s / 60, s % 60)
 }
 
+@androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
 @Composable
 fun EpisodeDetailScreen(vm: AppViewModel, episodeKey: String) {
     val context = LocalContext.current

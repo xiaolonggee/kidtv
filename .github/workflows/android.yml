@@ -3,6 +3,9 @@ on:
   push:
     branches: [main, 'feat/review-parent-1.5.5']
   workflow_dispatch:
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -22,7 +25,7 @@ jobs:
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > android/local.properties
       - name: Test, lint and build unsigned release
         working-directory: android
-        run: ./gradlew --no-daemon -Dorg.gradle.workers.max=2 -Pandroid.builder.sdkDownload=false -PunsignedRelease=true --continue testDebugUnitTest lintRelease assembleRelease
+        run: ./gradlew --no-daemon -Dorg.gradle.workers.max=2 -Pandroid.builder.sdkDownload=false -PunsignedRelease=true --continue assembleRelease lintRelease testDebugUnitTest
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -98,3 +98,10 @@ dependencies {
     testImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+// Bound JVM UI tests so a focus/idle regression fails visibly instead of hanging CI.
+tasks.withType<Test>().configureEach {
+    timeout.set(java.time.Duration.ofMinutes(4))
+    maxHeapSize = "1g"
+    testLogging { events("started", "passed", "failed", "skipped") }
+}
