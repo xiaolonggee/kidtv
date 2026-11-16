@@ -95,7 +95,7 @@ class ScreenshotTest {
         vm = AppViewModel(app)
         // 先让构造时的 rescan()（Main→IO→Main）彻底跑完，避免异步覆盖假媒体库
         repeat(30) {
-            compose.waitForIdle()
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
             Thread.sleep(20)
         }
         val dao = KidTvDb.get(app).dao()

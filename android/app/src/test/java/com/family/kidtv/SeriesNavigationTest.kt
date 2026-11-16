@@ -26,14 +26,20 @@ class SeriesNavigationTest {
     @Before fun setup() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         vm = AppViewModel(app)
-        repeat(30) { compose.waitForIdle(); Thread.sleep(20) }
+        repeat(30) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(20) }
         val episodes = (1..25).map { n -> Episode(
             key = "English/Test/$n.mp4", language = "English", seriesFolder = "Test",
             num = n, title = "Episode $n", cnTitle = "", filename = "$n.mp4",
             uri = "file:///tmp/$n.mp4", sizeBytes = 100, durationMs = 10000L) }
         vm.library.value = Library("/test", listOf("English"), listOf(
             Series("English", "Test", "Test", "", null, false, episodes)))
-        compose.setContent { SeriesScreen(vm, "English", "Test") }
+        compose.setContent {
+            val inputMode = androidx.compose.ui.platform.LocalInputModeManager.current
+            androidx.compose.runtime.SideEffect {
+                inputMode.requestInputMode(androidx.compose.ui.input.InputMode.Keyboard)
+            }
+            SeriesScreen(vm, "English", "Test")
+        }
         compose.waitForIdle()
     }
     @Test fun reviewIsPermanentRightHandTabAndEmptyStateWorks() {
