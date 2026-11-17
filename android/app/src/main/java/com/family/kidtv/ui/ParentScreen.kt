@@ -61,7 +61,7 @@ private data class SettingDef(
 private val BASIC_DEFS = listOf(
     SettingDef("每日集数上限", "Daily limit", { it.dailyLimit }, { s, v -> s.copy(dailyLimit = v) }, 1, 6, 1, { "$it 集" }),
     SettingDef("“熟了”所需次数", "Stars to master", { it.masterStars }, { s, v -> s.copy(masterStars = v) }, 3, 10, 1, { "$it 次" }),
-    SettingDef("本周片单数量", "Playlist size", { it.playlistSize }, { s, v -> s.copy(playlistSize = v) }, 3, 5, 1, { "$it 集" }),
+    SettingDef("本周片单数量", "Playlist size", { it.playlistSize }, { s, v -> s.copy(playlistSize = v) }, 3, 6, 1, { "$it 集" }),
     SettingDef(
         "播完默认", "顺序 / 循环 / 停止",
         get = { PlaybackMode.entries.indexOf(it.resolvedPlaybackMode()) },

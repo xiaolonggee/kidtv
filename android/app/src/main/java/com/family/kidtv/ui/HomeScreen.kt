@@ -47,6 +47,7 @@ import com.family.kidtv.GatePurpose
 import com.family.kidtv.Screen
 import com.family.kidtv.data.Episode
 import com.family.kidtv.data.Series
+import com.family.kidtv.data.seriesByPopularity
 import com.family.kidtv.storage.SafPicker
 
 private val WEEK_CN = listOf("一", "二", "三", "四", "五", "六", "日")
@@ -137,7 +138,7 @@ fun HomeScreen(vm: AppViewModel) {
 
         // Fixed columns keep remote navigation spatial and show multiple rows at once.
         SeriesGrid(
-            series = library.series.filter { it.language == curTab },
+            series = seriesByPopularity(library.series, curTab, counts),
             counts = counts, masterStars = settings.masterStars, covers = covers,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             onSelect = { vm.push(Screen.SeriesPage(it.language, it.folder)) },

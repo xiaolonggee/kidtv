@@ -16,7 +16,7 @@ data class Settings(
     val dailyLimit: Int = 2,
     val threshold: Int = 75,
     val masterStars: Int = 5,
-    val playlistSize: Int = 4,
+    val playlistSize: Int = 6,
     val autoplay: Boolean = true,              // 兼容旧字段；与 playbackMode 同步
     val playbackMode: String = PlaybackMode.SEQUENTIAL.storageKey,
     val wifiOnly: Boolean = true,
@@ -75,7 +75,8 @@ class SettingsRepo(private val context: Context) {
             dailyLimit = p[K.dailyLimit] ?: 2,
             threshold = p[K.threshold] ?: 75,
             masterStars = p[K.masterStars] ?: 5,
-            playlistSize = p[K.playlistSize] ?: 4,
+            // Preserve any saved choice; legacy settings did not record whether 4 was explicit.
+            playlistSize = p[K.playlistSize] ?: 6,
             autoplay = autoplay,
             playbackMode = mode,
             wifiOnly = p[K.wifiOnly] ?: true,

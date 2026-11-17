@@ -40,7 +40,7 @@ DEFAULT_DEVICE_SETTINGS = {
     "dailyLimit": 2,        # 每日集数上限
     "threshold": 75,        # 完成判定阈值（%）
     "masterStars": 5,       # “熟了”所需次数
-    "playlistSize": 4,      # 本周片单数量
+    "playlistSize": 6,      # 本周片单数量
     "autoplay": True,       # 兼容旧客户端；与 playbackMode 同步
     "playbackMode": "sequential",  # sequential | loop | stop
     "wifiOnly": True,       # 仅 Wi-Fi 下载
