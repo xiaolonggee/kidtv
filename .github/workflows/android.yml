@@ -1,7 +1,7 @@
 name: Android checks and unsigned APK
 on:
   push:
-    branches: [main, 'feat/review-parent-1.5.5', 'feat/series-grid-1.5.6']
+    branches: [main, 'feat/review-parent-1.5.5', 'feat/series-grid-1.5.6', 'fix/video-compat-1.5.7']
   workflow_dispatch:
 concurrency:
   group: android-${{ github.ref }}
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: KidTV-1.5.6-series-grid-build
+          name: KidTV-1.5.7-video-compat-build
           path: |
             android/app/build/outputs/apk/release/*unsigned.apk
             android/app/build/reports/tests/

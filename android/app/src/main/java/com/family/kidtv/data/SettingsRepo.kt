@@ -17,6 +17,7 @@ data class Settings(
     val threshold: Int = 75,
     val masterStars: Int = 5,
     val playlistSize: Int = 6,
+    val textureVideo: Boolean = true,          // TV compatibility; original SurfaceView remains selectable
     val autoplay: Boolean = true,              // 兼容旧字段；与 playbackMode 同步
     val playbackMode: String = PlaybackMode.SEQUENTIAL.storageKey,
     val wifiOnly: Boolean = true,
@@ -49,6 +50,7 @@ class SettingsRepo(private val context: Context) {
         val threshold = intPreferencesKey("threshold")
         val masterStars = intPreferencesKey("masterStars")
         val playlistSize = intPreferencesKey("playlistSize")
+        val textureVideo = booleanPreferencesKey("textureVideo")
         val autoplay = booleanPreferencesKey("autoplay")
         val playbackMode = stringPreferencesKey("playbackMode")
         val wifiOnly = booleanPreferencesKey("wifiOnly")
@@ -77,6 +79,7 @@ class SettingsRepo(private val context: Context) {
             masterStars = p[K.masterStars] ?: 5,
             // Preserve any saved choice; legacy settings did not record whether 4 was explicit.
             playlistSize = p[K.playlistSize] ?: 6,
+            textureVideo = p[K.textureVideo] ?: true,
             autoplay = autoplay,
             playbackMode = mode,
             wifiOnly = p[K.wifiOnly] ?: true,
@@ -103,6 +106,7 @@ class SettingsRepo(private val context: Context) {
             p[K.threshold] = s.threshold
             p[K.masterStars] = s.masterStars
             p[K.playlistSize] = s.playlistSize
+            p[K.textureVideo] = s.textureVideo
             p[K.autoplay] = s.autoplay
             p[K.playbackMode] = s.playbackMode
             p[K.wifiOnly] = s.wifiOnly

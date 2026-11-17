@@ -73,6 +73,7 @@ private val BASIC_DEFS = listOf(
 
 /** 高级：阈值、同步开关等 */
 private val ADVANCED_DEFS = listOf(
+    SettingDef("画面兼容模式", "有声音黑屏时可切换；下次播放生效", { if (it.textureVideo) 1 else 0 }, { s, v -> s.copy(textureVideo = v == 1) }, bool = true, fmt = { if (it == 1) "兼容 Texture" else "原版 Surface" }),
     SettingDef("完成判定阈值", "看到多少算看完", { it.threshold }, { s, v -> s.copy(threshold = v) }, 50, 100, 5, { "$it%" }),
     SettingDef("仅 Wi-Fi 下载", "同步新内容时", { if (it.wifiOnly) 1 else 0 }, { s, v -> s.copy(wifiOnly = v == 1) }, bool = true, fmt = { if (it == 1) "开 ON" else "关 OFF" }),
     SettingDef("同步删除本地文件", "后台删除的内容", { if (it.allowDelete) 1 else 0 }, { s, v -> s.copy(allowDelete = v == 1) }, bool = true, fmt = { if (it == 1) "开 ON" else "关 OFF" }),

@@ -3,6 +3,11 @@ package com.family.kidtv.ui
 import android.app.Activity
 import android.net.Uri
 import android.view.WindowManager
+import android.view.LayoutInflater
+import android.util.Log
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.VideoSize
+import com.family.kidtv.R
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -69,6 +74,9 @@ internal fun seekTarget(positionMs: Long, durationMs: Long, deltaMs: Long): Long
     return if (durationMs > 0L) target.coerceAtMost((durationMs - 1L).coerceAtLeast(0L)) else positionMs.coerceAtLeast(0L)
 }
 
+internal fun shouldCountVideoTime(isPlaying: Boolean, firstFrame: Boolean, hasError: Boolean): Boolean =
+    isPlaying && firstFrame && !hasError
+
 private fun mmss(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)
     return "%02d:%02d".format(s / 60, s % 60)
@@ -113,6 +121,13 @@ private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boo
     var finished by remember(episodeKey) { mutableStateOf(false) }
     var ended by remember(episodeKey) { mutableStateOf(false) }
 
+    var firstFrame by remember { mutableStateOf(false) }
+    var videoError by remember { mutableStateOf<String?>(null) }
+    var noFrameWarning by remember { mutableStateOf(false) }
+    var textureVideo by remember { mutableStateOf(settings.textureVideo) }
+    var videoSize by remember { mutableStateOf("等待画面") }
+    var outputGeneration by remember { mutableIntStateOf(0) }
+    var lastVisiblePositionMs by remember { mutableLongStateOf(0L) }
     var resumeApplied by remember(episodeKey) { mutableStateOf(false) }
     val player = remember(episodeKey) {
         ExoPlayer.Builder(context).build().apply {
@@ -127,6 +142,7 @@ private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boo
             player.seekTo(prog.positionMs)
             watchedMs = prog.passWatchedMs.coerceAtLeast(0L)
             positionMs = prog.positionMs
+            lastVisiblePositionMs = prog.positionMs
             resumeApplied = true
         } else {
             resumeApplied = true
@@ -140,11 +156,22 @@ private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boo
                 if (state == Player.STATE_ENDED && !finished) ended = true
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
+            override fun onRenderedFirstFrame() {
+                firstFrame = true
+                if (noFrameWarning && videoError == null && !finished) player.play()
+                noFrameWarning = false
+                Log.i("KidTVPlayback", "firstFrame output=${if (textureVideo) "texture" else "surface"}")
+            }
+            override fun onVideoSizeChanged(size: VideoSize) { videoSize = "${size.width}×${size.height}" }
+            override fun onPlayerError(error: PlaybackException) {
+                videoError = error.errorCodeName
+                Log.e("KidTVPlayback", error.errorCodeName, error)
+            }
         }
         player.addListener(listener)
         onDispose {
             // Persist progress on leave (unless already finished / cleared)
-            if (!finished) {
+            if (!finished && firstFrame && videoError == null) {
                 val pos = player.currentPosition
                 val dur = if (player.duration > 0) player.duration else durationMs
                 if (shouldClearResumePosition(pos, dur)) {
@@ -162,6 +189,12 @@ private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boo
         if (finished) return
         finished = true
         player.pause()
+        // Audio-only playback must not award stars, consume quota or overwrite resume progress.
+        if (!firstFrame || videoError != null) {
+            Toast.makeText(context, "画面未正常播放，本次不计观看次数", Toast.LENGTH_SHORT).show()
+            vm.pop()
+            return
+        }
         val dur = if (durationMs > 0) durationMs else 1L
         val pos = player.currentPosition
         val pct = watchedMs * 100 / dur
@@ -195,9 +228,10 @@ private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boo
     LaunchedEffect(episodeKey) {
         var sinceSave = 0L
         while (!finished) {
-            if (player.isPlaying) {
+            if (shouldCountVideoTime(player.isPlaying, firstFrame, videoError != null)) {
                 watchedMs += 250
                 positionMs = player.currentPosition
+                lastVisiblePositionMs = positionMs
                 if (player.duration > 0) durationMs = player.duration
                 sinceSave += 250
                 if (sinceSave >= PROGRESS_SAVE_INTERVAL_MS) {
@@ -206,6 +240,38 @@ private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boo
                 }
             }
             kotlinx.coroutines.delay(250)
+        }
+    }
+    // A missing first frame is not successful playback, even while audio advances.
+    LaunchedEffect(outputGeneration) {
+        var audibleMs = 0L
+        while (!firstFrame && videoError == null && !finished) {
+            kotlinx.coroutines.delay(250)
+            if (player.isPlaying) audibleMs += 250
+            if (audibleMs >= 8_000L && !firstFrame && videoError == null && !finished) {
+                noFrameWarning = true
+                player.pause()
+                break
+            }
+        }
+    }
+
+    fun switchOutput() {
+        firstFrame = false
+        videoError = null
+        noFrameWarning = false
+        textureVideo = !textureVideo
+        outputGeneration++
+        scope.launch { vm.updateSetting { it.copy(textureVideo = textureVideo) } }
+        // Re-seek after the replacement view binds so the decoder supplies a fresh frame.
+    }
+    LaunchedEffect(outputGeneration) {
+        if (outputGeneration > 0) {
+            kotlinx.coroutines.delay(100)
+            player.seekTo(lastVisiblePositionMs)
+            positionMs = lastVisiblePositionMs
+            if (player.playbackState == Player.STATE_IDLE) player.prepare()
+            player.play()
         }
     }
     // 自然播完
@@ -224,6 +290,8 @@ private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boo
             .focusable()
             .onKeyEvent { e ->
                 if (phase !is Phase.Playing || finished) return@onKeyEvent false
+                // Recovery buttons own focus. Do not restart invisible audio with transport keys.
+                if (noFrameWarning || videoError != null) return@onKeyEvent e.key in listOf(Key.MediaPlayPause, Key.MediaRewind, Key.MediaFastForward, Key.Spacebar)
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
                     Key.DirectionLeft, Key.MediaRewind -> { seekBy(-10_000L); true }
@@ -238,10 +306,11 @@ private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boo
         // ExoPlayer is recreated for each episode. Give its surface the same
         // lifetime and explicitly rebind in update, otherwise an AndroidView
         // retained by Compose can keep rendering the released previous player.
-        key(player) {
+        key(player, outputGeneration) {
             AndroidView(
                 factory = { ctx ->
-                    PlayerView(ctx).apply {
+                    (if (textureVideo) LayoutInflater.from(ctx).inflate(R.layout.kidtv_texture_player, null) as PlayerView
+                    else PlayerView(ctx)).apply {
                         useController = false
                         this.player = player
                         isFocusable = false
@@ -308,6 +377,18 @@ private fun PlayerSession(vm: AppViewModel, episodeKey: String, allowResume: Boo
                     "${mmss(positionMs)} / ${mmss(durationMs)}",
                     color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
                 )
+            }
+        }
+
+        if (noFrameWarning || videoError != null) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .88f)), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("画面没有正常显示", color = Color.White, fontSize = 28.sp)
+                    Text("本次异常播放不计观看次数", color = C.Muted, fontSize = 17.sp)
+                    Text("${if (textureVideo) "Texture" else "Surface"} · $videoSize · ${videoError ?: "未收到首帧"}", color = C.Muted, fontSize = 15.sp)
+                    TvButton("切换显示模式并重试", primary = true, requestInitialFocus = true, onClick = { switchOutput() })
+                    TvButton("返回", onClick = { finishPlay(false) })
+                }
             }
         }
 
