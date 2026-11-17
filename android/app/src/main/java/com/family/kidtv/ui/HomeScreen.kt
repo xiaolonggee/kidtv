@@ -19,6 +19,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -131,16 +135,13 @@ fun HomeScreen(vm: AppViewModel) {
         }
         Spacer(Modifier.height(8.dp))
 
-        // ---------------- 系列卡片 ----------------
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(6.dp)) {
-            items(library.series.filter { it.language == curTab }, key = { it.language + "/" + it.folder }) { s ->
-                val thumb = s.episodes.firstNotNullOfOrNull { covers[it.key] } ?: s.coverUri
-                SeriesCard(s, counts, settings.masterStars, coverUri = thumb) {
-                    vm.push(Screen.SeriesPage(s.language, s.folder))
-                }
-            }
-        }
-        Spacer(Modifier.weight(1f))
+        // Fixed columns keep remote navigation spatial and show multiple rows at once.
+        SeriesGrid(
+            series = library.series.filter { it.language == curTab },
+            counts = counts, masterStars = settings.masterStars, covers = covers,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            onSelect = { vm.push(Screen.SeriesPage(it.language, it.folder)) },
+        )
         Text(
             "⬆⬇⬅➡ 移动 · OK 确认 · 返回键 返回",
             color = C.Muted.copy(alpha = 0.8f), fontSize = 12.sp,
@@ -281,6 +282,28 @@ private fun LangTab(lang: String, selected: Boolean, onSelect: () -> Unit) {
 }
 
 @Composable
+internal fun SeriesGrid(
+    series: List<Series>, counts: Map<String, Int>, masterStars: Int,
+    covers: Map<String, String>, modifier: Modifier = Modifier,
+    onSelect: (Series) -> Unit,
+) {
+    // Reset scroll when changing language; stable keys retain focus within that language.
+    androidx.compose.runtime.key(series.firstOrNull()?.language) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4), modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(6.dp),
+        ) {
+            items(series, key = { it.language + "/" + it.folder }) { s ->
+                val thumb = s.episodes.firstNotNullOfOrNull { covers[it.key] } ?: s.coverUri
+                SeriesCard(s, counts, masterStars, thumb) { onSelect(s) }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SeriesCard(
     s: Series,
     counts: Map<String, Int>,
@@ -293,18 +316,18 @@ private fun SeriesCard(
     val mastered = s.episodes.count { (counts[it.key] ?: 0) >= masterStars }
     Focusable(
         onClick = onClick,
-        modifier = Modifier.width(300.dp).height(150.dp),
+        modifier = Modifier.fillMaxWidth().height(88.dp).testTag("series-${s.language}/${s.folder}"),
         shape = RoundedCornerShape(22.dp),
     ) {
         Row(Modifier.clip(RoundedCornerShape(22.dp))) {
-            Art(s.displayName, s.cnName, coverUri, Modifier.width(130.dp).fillMaxHeight(), emojiSize = 56.sp)
-            Column(Modifier.background(C.Panel).weight(1f).fillMaxHeight().padding(12.dp)) {
+            Art(s.displayName, s.cnName, coverUri, Modifier.width(66.dp).fillMaxHeight(), emojiSize = 36.sp)
+            Column(Modifier.background(C.Panel).weight(1f).fillMaxHeight().padding(8.dp)) {
                 Text(
-                    s.displayName, color = C.Text, fontSize = 18.sp, fontWeight = FontWeight.Black,
+                    s.displayName, color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.Black,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                if (s.cnName.isNotEmpty()) Text(s.cnName, color = C.Muted, fontSize = 14.sp, maxLines = 1)
-                if (s.fav) Text("❤️ 宝宝最爱", color = C.Pink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                if (s.cnName.isNotEmpty()) Text(s.cnName, color = C.Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (s.fav) Text("❤️ 宝宝最爱", color = C.Pink, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 Text("已看 $started/$total · 熟了 $mastered", color = C.Muted, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
