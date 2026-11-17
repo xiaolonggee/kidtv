@@ -2,6 +2,8 @@ package com.family.kidtv
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.test.core.app.ApplicationProvider
 import com.family.kidtv.data.Episode
 import com.family.kidtv.data.KidTvDb
@@ -157,6 +159,17 @@ class ScreenshotTest {
     }
 
     @Test fun home() = snap("tv-01-home") { HomeScreen(vm) }
+
+    @Test fun homeEightSeriesFitWithoutScrolling() {
+        val base = vm.library.value.series.first()
+        vm.library.value = Library("/test", listOf("英语", "法语"), (1..8).map {
+            base.copy(folder = "Cartoon $it", displayName = "Cartoon $it", cnName = "动画 $it")
+        })
+        snap("tv-01-home-eight") { HomeScreen(vm) }
+        (1..8).forEach {
+            compose.onNodeWithTag("series-英语/Cartoon $it").assertIsDisplayed()
+        }
+    }
 
     @Test fun series() = snap("tv-02-series") { SeriesScreen(vm, "英语", "Mouse Boo 小鼠波波") }
 

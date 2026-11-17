@@ -67,7 +67,7 @@ fun HomeScreen(vm: AppViewModel) {
     val languages = library.languages
     val curTab = if (tab in languages) tab else languages.firstOrNull() ?: ""
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 16.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 12.dp)) {
         // ---------------- 顶栏 ----------------
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("🧸", fontSize = 36.sp)
@@ -88,7 +88,7 @@ fun HomeScreen(vm: AppViewModel) {
             Spacer(Modifier.width(10.dp))
             TvButton("🔒 家长", onClick = { vm.openGate(GatePurpose.ParentSettings) })
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
 
         if (library.series.isEmpty()) {
             EmptyLibrary(vm, scanning)
@@ -104,7 +104,7 @@ fun HomeScreen(vm: AppViewModel) {
                 color = C.Muted, fontSize = 13.sp,
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         val playlist = vm.playlist
         if (playlist.isEmpty()) {
             Text("片单空空的～ 所有动画都熟了！", color = C.Muted, fontSize = 15.sp, modifier = Modifier.padding(12.dp))
@@ -125,7 +125,7 @@ fun HomeScreen(vm: AppViewModel) {
                 }
             }
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
 
         // ---------------- 语言标签页 ----------------
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -133,7 +133,7 @@ fun HomeScreen(vm: AppViewModel) {
                 LangTab(lang, selected = lang == curTab, onSelect = { tab = lang })
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
 
         // Fixed columns keep remote navigation spatial and show multiple rows at once.
         SeriesGrid(
@@ -173,7 +173,7 @@ private fun EmptyLibrary(vm: AppViewModel, scanning: Boolean) {
             if (scanning) "正在找动画片…" else "还没有动画片哦",
             color = C.Text, fontSize = 32.sp, fontWeight = FontWeight.Black,
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
             if (scanning) "请稍等一下下"
             else "请爸爸妈妈帮帮忙：\n① 插上 U 盘 ② 选好动画片文件夹",
@@ -212,40 +212,19 @@ private fun PlaylistCard(
 ) {
     Focusable(
         onClick = onClick,
-        modifier = Modifier.width(200.dp).height(158.dp),
-        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.width(230.dp).height(72.dp),
+        shape = RoundedCornerShape(24.dp),
         requestInitialFocus = first,
     ) {
-        Column(Modifier.clip(RoundedCornerShape(20.dp))) {
-            Box(Modifier.fillMaxWidth().height(88.dp)) {
-                Art(ep.seriesFolder, cnName, coverUri, Modifier.fillMaxSize(), emojiSize = 40.sp)
-                Text(
-                    languageTag(ep.language), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(8.dp)
-                        .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-                if (plays == 0) Text(
-                    "新", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
-                        .background(Color(0xFFFF4D7E), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-            }
-            Column(Modifier.background(C.Panel).fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp)) {
-                Text(
-                    "%02d · %s".format(ep.num, ep.title),
-                    color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.Black,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        cnName.ifEmpty { ep.seriesFolder }, color = C.Muted, fontSize = 12.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-                    )
-                    Stars(plays, max, 16.sp)
-                }
+        Row(Modifier.clip(RoundedCornerShape(24.dp))) {
+            Art(ep.seriesFolder, cnName, coverUri, Modifier.width(64.dp).fillMaxHeight(), emojiSize = 32.sp)
+            Column(Modifier.weight(1f).padding(8.dp)) {
+                Text("%02d · %s".format(ep.num, ep.title), color = C.Text,
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(cnName.ifEmpty { ep.seriesFolder }, color = C.Muted,
+                    fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Stars(plays, max, 14.sp)
             }
         }
     }
@@ -256,14 +235,14 @@ private fun LangTab(lang: String, selected: Boolean, onSelect: () -> Unit) {
     Focusable(
         onClick = onSelect,
         modifier = Modifier
-            .height(46.dp)
+            .height(38.dp)
             .onFocusChanged { if (it.isFocused) onSelect() },
         shape = RoundedCornerShape(23.dp),
         background = if (selected) Color.White else Color.White.copy(alpha = 0.08f),
         focusScale = 1.04f,
     ) {
         Row(
-            Modifier.height(46.dp).padding(horizontal = 20.dp),
+            Modifier.height(38.dp).padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(languageEmoji(lang), fontSize = 18.sp)
@@ -291,8 +270,8 @@ internal fun SeriesGrid(
     androidx.compose.runtime.key(series.firstOrNull()?.language) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(4), modifier = modifier,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(6.dp),
         ) {
             items(series, key = { it.language + "/" + it.folder }) { s ->
@@ -316,18 +295,20 @@ private fun SeriesCard(
     val mastered = s.episodes.count { (counts[it.key] ?: 0) >= masterStars }
     Focusable(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(88.dp).testTag("series-${s.language}/${s.folder}"),
-        shape = RoundedCornerShape(22.dp),
+        modifier = Modifier.fillMaxWidth().height(80.dp).testTag("series-${s.language}/${s.folder}"),
+        shape = RoundedCornerShape(32.dp),
+        focusScale = 1.08f,
+        backgroundBrush = androidx.compose.ui.graphics.Brush.linearGradient(
+            listOf(C.seriesColors(s.displayName).first.copy(alpha = 0.45f), C.Panel)),
     ) {
-        Row(Modifier.clip(RoundedCornerShape(22.dp))) {
+        Row(Modifier.clip(RoundedCornerShape(32.dp))) {
             Art(s.displayName, s.cnName, coverUri, Modifier.width(66.dp).fillMaxHeight(), emojiSize = 36.sp)
-            Column(Modifier.background(C.Panel).weight(1f).fillMaxHeight().padding(8.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 8.dp, vertical = 6.dp)) {
                 Text(
-                    s.displayName, color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.Black,
+                    (if (s.fav) "♥ " else "") + s.displayName, color = C.Text, fontSize = 14.sp, fontWeight = FontWeight.Black,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 if (s.cnName.isNotEmpty()) Text(s.cnName, color = C.Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (s.fav) Text("❤️ 宝宝最爱", color = C.Pink, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 Text("已看 $started/$total · 熟了 $mastered", color = C.Muted, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
